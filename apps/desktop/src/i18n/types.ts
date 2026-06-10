@@ -213,6 +213,9 @@ export interface Translations {
       colorModeDesc: string
       toolViewTitle: string
       toolViewDesc: string
+      completionSoundTitle: string
+      completionSoundDesc: string
+      completionSoundPreview: string
       product: string
       productDesc: string
       technical: string
