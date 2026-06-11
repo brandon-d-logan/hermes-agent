@@ -212,6 +212,29 @@ const CenteredThreadSpinner: FC = () => {
   )
 }
 
+const FULL_FMT = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  month: 'short'
+})
+
+const InlineTimestamp: FC = () => {
+  const createdAt = useAuiState(s => s.message.createdAt)
+
+  if (!createdAt) return null
+
+  const date = new Date(createdAt)
+
+  if (Number.isNaN(date.getTime())) return null
+
+  return (
+    <span className="text-[0.68rem] leading-none text-(--ui-text-tertiary) select-none" title={FULL_FMT.format(date)}>
+      {FULL_FMT.format(date)}
+    </span>
+  )
+}
+
 const AssistantMessage: FC<{ onBranchInNewChat?: (messageId: string) => void }> = ({ onBranchInNewChat }) => {
   const messageId = useAuiState(s => s.message.id)
   const content = useAuiState(s => s.message.content)
@@ -242,6 +265,9 @@ const AssistantMessage: FC<{ onBranchInNewChat?: (messageId: string) => void }> 
       data-streaming={messageStatus === 'running' ? 'true' : undefined}
       ref={enterRef}
     >
+      <div className="flex items-center gap-2 px-(--message-text-indent) pb-0.5">
+        <InlineTimestamp />
+      </div>
       <div
         className="wrap-anywhere min-w-0 max-w-full overflow-hidden text-pretty text-[length:var(--conversation-text-font-size)] leading-(--dt-line-height) text-foreground"
         data-slot="aui_assistant-message-content"
@@ -804,6 +830,9 @@ const UserMessage: FC<{
 
   const bubbleContent = (
     <>
+      <div className="flex justify-end pb-1">
+        <InlineTimestamp />
+      </div>
       {attachmentRefs.length > 0 && (
         <span className="-mx-1 flex flex-wrap gap-1 border-b border-border/45 pb-1.5">
           <DirectiveContent text={attachmentRefs.join(' ')} />
