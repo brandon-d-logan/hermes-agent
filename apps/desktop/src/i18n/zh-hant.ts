@@ -749,6 +749,7 @@ export const zhHant = defineLocale({
     back: '返回',
     searchPlaceholder: '搜尋工作階段、檢視和動作',
     goTo: '前往',
+    goToSession: '前往工作階段',
     commandCenter: '命令中心',
     appearance: '外觀',
     settings: '設定',
@@ -1741,6 +1742,7 @@ export const zhHant = defineLocale({
   assistant: {
     thread: {
       loadingSession: '正在載入工作階段',
+      showEarlier: '顯示較早的訊息',
       loadingResponse: 'Hermes 正在載入回覆',
       thinking: '思考中',
       today: time => `今天，${time}`,
