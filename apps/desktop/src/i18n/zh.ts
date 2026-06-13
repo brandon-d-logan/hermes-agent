@@ -291,6 +291,8 @@ export const zh: Translations = {
       colorModeDesc: '选择固定模式，或让 Hermes 跟随系统设置。',
       toolViewTitle: '工具调用显示',
       toolViewDesc: '产品模式隐藏原始工具数据；技术模式显示完整输入/输出。',
+      translucencyTitle: '窗口半透明',
+      translucencyDesc: '透过整个窗口看到桌面。仅限 macOS 和 Windows。',
       completionSoundTitle: 'Completion Sound',
       completionSoundDesc: 'Choose a chime that plays when Hermes finishes responding.',
       completionSoundPreview: 'Preview',

@@ -2384,6 +2384,61 @@ class GatewaySlashCommandsMixin:
                 example = t("gateway.footer.example_line", preview=preview)
         return t("gateway.footer.saved", state=state, example=example)
 
+    async def _handle_timestamps_command(self, event: MessageEvent) -> str:
+        """Handle /timestamps command — toggle timestamps on session turns.
+
+        Usage:
+            /timestamps       → toggle on/off
+            /timestamps on    → enable
+            /timestamps off   → disable
+
+        The setting is saved to ``display.timestamps`` in config.yaml.
+        """
+        from gateway.run import _hermes_home, _load_gateway_config
+
+        config_path = _hermes_home / "config.yaml"
+
+        # --- parse argument -------------------------------------------------
+        arg = ""
+        try:
+            text = (getattr(event, "message", None) or "").strip()
+            if text.startswith("/"):
+                parts = text.split(None, 1)
+                if len(parts) > 1:
+                    arg = parts[1].strip().lower()
+        except Exception:
+            arg = ""
+
+        # --- load config ----------------------------------------------------
+        try:
+            user_config: dict = _load_gateway_config()
+        except Exception as e:
+            return t("gateway.config_read_failed", error=e)
+
+        current = bool((user_config.get("display") or {}).get("timestamps", False))
+
+        if arg in {"on", "enable", "true", "1"}:
+            new_state = True
+        elif arg in {"off", "disable", "false", "0"}:
+            new_state = False
+        elif arg == "":
+            new_state = not current
+        else:
+            return "Usage: /timestamps [on|off]"
+
+        # --- write config ---------------------------------------------------
+        try:
+            if not isinstance(user_config.get("display"), dict):
+                user_config["display"] = {}
+            user_config["display"]["timestamps"] = new_state
+            atomic_yaml_write(config_path, user_config)
+        except Exception as e:
+            logger.warning("Failed to save display.timestamps: %s", e)
+            return t("gateway.config_save_failed", error=e)
+
+        state = "on" if new_state else "off"
+        return f"Timestamps turned {state}."
+
     async def _handle_compress_command(self, event: MessageEvent) -> str:
         """Handle /compress command -- manually compress conversation context.
 

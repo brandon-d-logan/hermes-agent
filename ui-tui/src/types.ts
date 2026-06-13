@@ -124,6 +124,7 @@ export interface Msg {
   todos?: TodoItem[]
   todoIncomplete?: boolean
   todoCollapsedByDefault?: boolean
+  timestamp?: string  // ISO timestamp when message was recorded (client-side)
 }
 
 export type Role = 'assistant' | 'system' | 'tool' | 'user'

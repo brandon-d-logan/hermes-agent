@@ -131,6 +131,7 @@ export interface UiState {
   sessionTitle: string
   showCost: boolean
   showReasoning: boolean
+  showTimestamps: boolean
   indicatorStyle: IndicatorStyle
   sid: null | string
   status: string

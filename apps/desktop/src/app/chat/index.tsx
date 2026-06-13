@@ -11,7 +11,7 @@ import { Suspense, useCallback, useMemo, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 
 import { Thread } from '@/components/assistant-ui/thread'
-import { Backdrop } from '@/components/Backdrop'
+// Backdrop removed — chat background is solid via bg-(--ui-chat-surface-background)
 import { PromptOverlays } from '@/components/prompt-overlays'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -394,7 +394,6 @@ export function ChatView({
         className
       )}
     >
-      <Backdrop />
       <ChatHeader
         activeSessionId={activeSessionId}
         isRoutedSessionView={isRoutedSessionView}

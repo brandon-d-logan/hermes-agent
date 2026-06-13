@@ -1,4 +1,5 @@
 import { Ansi, Box, NoSelect, Text } from '@hermes/ink'
+import { useStore } from '@nanostores/react'
 import { memo, useState } from 'react'
 
 import { TERMUX_TUI_MODE } from '../config/env.js'
@@ -19,6 +20,7 @@ import {
 import type { Theme } from '../theme.js'
 import type { ActiveTool, DetailsMode, Msg, SectionVisibility } from '../types.js'
 
+import { $uiState } from '../app/uiStore.js'
 import { Md } from './markdown.js'
 import { StreamingMd } from './streamingMarkdown.js'
 import { ToolTrail } from './thinking.js'
@@ -39,6 +41,23 @@ export const MessageLine = memo(function MessageLine({
   t,
   tools = []
 }: MessageLineProps) {
+  const { showTimestamps } = useStore($uiState)
+
+  // Format timestamp as "Mon DD HH:MM" or "HH:MM" if today (local system time)
+  const timeLabel = (() => {
+    if (!showTimestamps || !msg.timestamp) return ''
+    const d = new Date(msg.timestamp)
+    const now = new Date()
+    const isToday = d.toDateString() === now.toDateString()
+    if (isToday) {
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+    }
+    // Different year: include full date. Same year: omit year.
+    const sameYear = d.getFullYear() === now.getFullYear()
+    const monthDay = d.toLocaleDateString(undefined, { month: 'short', day: '2-digit' })
+    const hm = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+    return sameYear ? `${monthDay} ${hm}` : `${monthDay} '${String(d.getFullYear()).slice(2)} ${hm}`
+  })()
   // Per-section overrides win over the global mode, so resolve each section
   // we might consume here once and gate visibility on the *content-bearing*
   // sections only — never on the global mode.  A `trail` message feeds Tool
@@ -233,7 +252,10 @@ export const MessageLine = memo(function MessageLine({
           </Text>
         </NoSelect>
 
-        <Box width={transcriptBodyWidth(cols, msg.role, t.brand.prompt, TERMUX_TUI_MODE)}>{content}</Box>
+        <Box width={transcriptBodyWidth(cols, msg.role, t.brand.prompt, TERMUX_TUI_MODE)}>
+          {timeLabel && <Text color={t.color.muted} dimColor>{timeLabel} </Text>}
+          {content}
+        </Box>
       </Box>
     </Box>
   )

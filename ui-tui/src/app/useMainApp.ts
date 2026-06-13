@@ -406,7 +406,10 @@ export function useMainApp(gw: GatewayClient) {
   )
 
   const appendMessage = useCallback(
-    (msg: Msg) => setHistoryItems(prev => capHistory(appendTranscriptMessage(prev, msg))),
+    (msg: Msg) => {
+      const withTs = msg.timestamp ? msg : { ...msg, timestamp: new Date().toISOString() }
+      setHistoryItems(prev => capHistory(appendTranscriptMessage(prev, withTs)))
+    },
     []
   )
 

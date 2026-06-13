@@ -25,6 +25,7 @@ const buildUiState = (): UiState => ({
   sessionTitle: '',
   showCost: false,
   showReasoning: false,
+  showTimestamps: true,
   sid: null,
   status: 'summoning hermes…',
   statusBar: 'top',

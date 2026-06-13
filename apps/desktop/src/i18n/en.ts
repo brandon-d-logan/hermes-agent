@@ -296,6 +296,8 @@ export const en: Translations = {
       colorModeDesc: 'Pick a fixed mode or let Hermes follow your system setting.',
       toolViewTitle: 'Tool Call Display',
       toolViewDesc: 'Product hides raw tool payloads; Technical shows full input/output.',
+      translucencyTitle: 'Window Translucency',
+      translucencyDesc: 'See your desktop through the whole window. macOS and Windows only.',
       completionSoundTitle: 'Completion Sound',
       completionSoundDesc: 'Choose a chime that plays when Hermes finishes responding. The Rupee option plays your custom WAV from ~/.hermes/sounds/.',
       completionSoundPreview: 'Preview',
