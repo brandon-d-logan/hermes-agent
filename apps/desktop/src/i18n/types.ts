@@ -1326,6 +1326,7 @@ export interface Translations {
       stopReading: string
       readAloud: string
       editMessage: string
+      scrollToBottom: string
       stop: string
       restorePrevious: string
       restoreCheckpoint: string

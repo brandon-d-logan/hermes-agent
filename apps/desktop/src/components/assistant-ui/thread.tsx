@@ -52,7 +52,12 @@ import {
 } from '@/app/chat/composer/rich-editor'
 import { detectTrigger, textBeforeCaret, type TriggerState } from '@/app/chat/composer/text-utils'
 import { ComposerTriggerPopover } from '@/app/chat/composer/trigger-popover'
-import { extractDroppedFiles, HERMES_PATHS_MIME, isImagePath, partitionDroppedFiles } from '@/app/chat/hooks/use-composer-actions'
+import {
+  extractDroppedFiles,
+  HERMES_PATHS_MIME,
+  isImagePath,
+  partitionDroppedFiles
+} from '@/app/chat/hooks/use-composer-actions'
 import { uploadComposerAttachment } from '@/app/session/hooks/use-prompt-actions'
 import { ClarifyTool } from '@/components/assistant-ui/clarify-tool'
 import { DirectiveContent, hermesDirectiveFormatter } from '@/components/assistant-ui/directive-text'
@@ -733,15 +738,22 @@ function messageAttachmentRefs(value: unknown): string[] {
   return value.every(ref => typeof ref === 'string') ? value : EMPTY_ATTACHMENT_REFS
 }
 
-function StickyHumanMessageContainer({ children }: { children: ReactNode }) {
+function StickyHumanMessageContainer({ attachments, children }: { attachments?: ReactNode; children: ReactNode }) {
   return (
-    <div
-      className="group/user-message sticky z-40 -mx-4 flex w-[calc(100%+2rem)] min-w-0 max-w-none flex-col items-stretch gap-0 self-end overflow-visible bg-(--ui-chat-surface-background) px-4 pb-(--conversation-turn-gap) pt-2"
-      data-role="user"
-      data-slot="aui_user-message-root"
-    >
-      {children}
-    </div>
+    // Fragment, not a wrapper: a wrapping element becomes the sticky's
+    // containing block (it'd stick within its own height = never). The bubble
+    // and attachments are flow siblings so the bubble pins against the scroller
+    // while attachments below it scroll away.
+    <>
+      <div
+        className="group/user-message sticky z-40 -mx-4 flex w-[calc(100%+2rem)] min-w-0 max-w-none flex-col items-stretch gap-0 self-end overflow-visible bg-(--ui-chat-surface-background) px-4 pb-(--conversation-turn-gap) pt-1"
+        data-role="user"
+        data-slot="aui_user-message-root"
+      >
+        {children}
+      </div>
+      {attachments}
+    </>
   )
 }
 
@@ -906,7 +918,18 @@ const UserMessage: FC<{
 
   return (
     <MessagePrimitive.Root asChild>
-      <StickyHumanMessageContainer>
+      <StickyHumanMessageContainer
+        attachments={
+          // Attachments live BELOW the sticky bubble in normal flow, so they
+          // scroll away behind the pinned bubble instead of riding along with
+          // it. Image refs render as thumbnails, file refs as chips; no border.
+          attachmentRefs.length > 0 ? (
+            <div className="flex flex-wrap gap-1 -mt-3 mb-2">
+              <DirectiveContent text={attachmentRefs.join(' ')} />
+            </div>
+          ) : null
+        }
+      >
         <ActionBarPrimitive.Root className="relative w-full max-w-full" data-slot="aui_user-bubble-actions">
           <div className="human-message-with-todos-wrapper flex w-full flex-col gap-0">
             <div className="relative w-full">
@@ -1359,7 +1382,10 @@ const UserEditComposer: FC<UserEditComposerProps> = ({ cwd, gateway, sessionId }
       }
 
       const remote = $connection.get()?.mode === 'remote'
-      const requestGateway = <T,>(method: string, params?: Record<string, unknown>) => gateway.request<T>(method, params)
+
+      const requestGateway = <T,>(method: string, params?: Record<string, unknown>) =>
+        gateway.request<T>(method, params)
+
       const refs: InlineRefInput[] = []
 
       for (const candidate of osDrops) {
