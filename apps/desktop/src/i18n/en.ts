@@ -1688,6 +1688,7 @@ export const en: Translations = {
       gatewayDisconnected: 'Hermes gateway is not connected',
       sendFailed: 'Could not send approval response',
       run: 'Run',
+      command: 'Command',
       moreOptions: 'More approval options',
       allowSession: 'Allow this session',
       alwaysAllowMenu: 'Always allow…',
