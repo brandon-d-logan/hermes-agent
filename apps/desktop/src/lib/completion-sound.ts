@@ -1,8 +1,7 @@
 // Completion sound bank for agent turn-end cues.
-// Fourteen synthesized presets plus a custom WAV file option.
-// Default is variant 1 (Two-note comfort).
+// Fourteen curated presets for A/B in Settings → Appearance. Default is variant 1.
 
-import { CUSTOM_SOUND_VARIANT_ID, $completionSoundVariantId } from '@/store/completion-sound'
+import { $completionSoundVariantId, resolveCompletionSoundVariantId } from '@/store/completion-sound'
 import { $hapticsMuted } from '@/store/haptics'
 
 type OscType = OscillatorType
@@ -23,11 +22,10 @@ function getCtx(): AudioContext | null {
       }
 
       ctx = new Ctor()
-
-      // Kick off custom WAV load once preload bridge is ready
-      void initCustomSound()
     }
 
+    // Autoplay policies can leave the context suspended until a gesture; a
+    // resume() here recovers it once the user has interacted with the window.
     if (ctx.state === 'suspended') {
       void ctx.resume().catch(() => undefined)
     }
@@ -38,13 +36,13 @@ function getCtx(): AudioContext | null {
   }
 }
 
-// ── Sound primitives ────────────────────────────────────────────────
-
+// One enveloped oscillator voice → master. Linear attack into an exponential
+// decay keeps the tail smooth and avoids the click you get ramping to zero.
 function voice(ac: AudioContext, master: GainNode, t0: number, spec: ToneSpec) {
   const osc = ac.createOscillator()
   const env = ac.createGain()
   const start = t0 + (spec.start ?? 0)
-  const peak = Math.max(spec.gain ?? 0.5, 0.0002)
+  const peak = spec.gain ?? 0.5
   const attack = spec.attack ?? 0.006
   const end = start + spec.dur
 
@@ -52,7 +50,7 @@ function voice(ac: AudioContext, master: GainNode, t0: number, spec: ToneSpec) {
   osc.frequency.setValueAtTime(spec.freq, start)
 
   env.gain.setValueAtTime(0.0001, start)
-  env.gain.exponentialRampToValueAtTime(peak, start + attack)
+  env.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), start + attack)
   env.gain.exponentialRampToValueAtTime(0.0001, end)
 
   osc.connect(env)
@@ -61,6 +59,7 @@ function voice(ac: AudioContext, master: GainNode, t0: number, spec: ToneSpec) {
   osc.stop(end + 0.02)
 }
 
+// Soft pluck: brief triangle strike with an upward glide into the bloom.
 function pluckVoice(ac: AudioContext, master: GainNode, t0: number, spec: PluckSpec) {
   const osc = ac.createOscillator()
   const env = ac.createGain()
@@ -83,6 +82,7 @@ function pluckVoice(ac: AudioContext, master: GainNode, t0: number, spec: PluckS
   osc.stop(end + 0.02)
 }
 
+// Slow-swell harmonic bloom — the dreamy tail after the pluck.
 function bloomVoice(ac: AudioContext, master: GainNode, t0: number, spec: BloomSpec) {
   const osc = ac.createOscillator()
   const env = ac.createGain()
@@ -110,23 +110,31 @@ function bloomVoice(ac: AudioContext, master: GainNode, t0: number, spec: BloomS
   osc.stop(end + 0.02)
 }
 
-function airPuff(ac: AudioContext, master: GainNode, t0: number, spec: AirPuffSpec) {
-  const seconds = 0.12
+// One-shot white-noise source of a given length, the raw material for the
+// bandpassed air/whoosh gestures below.
+function noiseSource(ac: AudioContext, seconds: number): AudioBufferSourceNode {
   const length = Math.floor(ac.sampleRate * seconds)
-  const noise = ac.createBuffer(1, length, ac.sampleRate)
-  const data = noise.getChannelData(0)
+  const buffer = ac.createBuffer(1, length, ac.sampleRate)
+  const data = buffer.getChannelData(0)
 
   for (let i = 0; i < length; i += 1) {
     data[i] = Math.random() * 2 - 1
   }
 
   const source = ac.createBufferSource()
+  source.buffer = buffer
+
+  return source
+}
+
+// A whisper of bandpassed noise for PS5-menu airiness.
+function airPuff(ac: AudioContext, master: GainNode, t0: number, spec: AirPuffSpec) {
+  const source = noiseSource(ac, 0.12)
   const filter = ac.createBiquadFilter()
   const env = ac.createGain()
   const start = t0 + (spec.start ?? 0)
   const end = start + spec.decay
 
-  source.buffer = noise
   filter.type = 'bandpass'
   filter.frequency.setValueAtTime(spec.freq, start)
   filter.Q.setValueAtTime(spec.q ?? 1.2, start)
@@ -142,23 +150,14 @@ function airPuff(ac: AudioContext, master: GainNode, t0: number, spec: AirPuffSp
   source.stop(end + 0.02)
 }
 
+// Filtered noise sweep — soft send / whoosh gestures.
 function whooshVoice(ac: AudioContext, master: GainNode, t0: number, spec: WhooshSpec) {
-  const seconds = 0.4
-  const length = Math.floor(ac.sampleRate * seconds)
-  const noise = ac.createBuffer(1, length, ac.sampleRate)
-  const data = noise.getChannelData(0)
-
-  for (let i = 0; i < length; i += 1) {
-    data[i] = Math.random() * 2 - 1
-  }
-
-  const source = ac.createBufferSource()
+  const source = noiseSource(ac, 0.4)
   const filter = ac.createBiquadFilter()
   const env = ac.createGain()
   const start = t0 + (spec.start ?? 0)
   const end = start + spec.decay
 
-  source.buffer = noise
   filter.type = 'bandpass'
   filter.frequency.setValueAtTime(spec.freqFrom, start)
   filter.frequency.exponentialRampToValueAtTime(spec.freqTo, end)
@@ -175,6 +174,7 @@ function whooshVoice(ac: AudioContext, master: GainNode, t0: number, spec: Whoos
   source.stop(end + 0.02)
 }
 
+// Pitch-sweep chirp — modem / sci-fi gestures.
 function sweepVoice(ac: AudioContext, master: GainNode, t0: number, spec: SweepSpec) {
   const osc = ac.createOscillator()
   const env = ac.createGain()
@@ -196,26 +196,41 @@ function sweepVoice(ac: AudioContext, master: GainNode, t0: number, spec: SweepS
   osc.stop(end + 0.02)
 }
 
+let reverbImpulse: AudioBuffer | null = null
+
+// Subtle wet send so the chimes sit in a room rather than a tin can. The impulse
+// is generated once and cached; each play gets a fresh, disposable convolver.
 function makeReverb(ac: AudioContext): ConvolverNode {
-  const tail = 0.18
-  const len = Math.floor(ac.sampleRate * tail)
-  const buffer = ac.createBuffer(2, len, ac.sampleRate)
+  if (!reverbImpulse) {
+    const seconds = 1.6
+    const length = Math.floor(ac.sampleRate * seconds)
+    reverbImpulse = ac.createBuffer(2, length, ac.sampleRate)
 
-  for (let ch = 0; ch < 2; ch += 1) {
-    const data = buffer.getChannelData(ch)
+    for (let channel = 0; channel < 2; channel += 1) {
+      const data = reverbImpulse.getChannelData(channel)
 
-    for (let i = 0; i < len; i += 1) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / len)
+      for (let i = 0; i < length; i += 1) {
+        // White noise with a steep exponential decay → smooth, short tail.
+        data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2.6
+      }
     }
   }
 
   const convolver = ac.createConvolver()
-  convolver.buffer = buffer
+  convolver.buffer = reverbImpulse
+
   return convolver
 }
 
-// ── Pitch constants ─────────────────────────────────────────────────
+export interface CompletionSoundVariant {
+  id: number
+  name: string
+  // `master` is warm (runs through low-pass + room tail).
+  play: (ac: AudioContext, master: GainNode, t0: number) => void
+}
 
+// Note frequencies (equal temperament). Everything lives in a low-mid register
+// (C3–C5) so the chimes feel warm and "appy" rather than bright and arcade-y.
 const A2 = 110
 const A3 = 220
 const A4 = 440
@@ -230,8 +245,6 @@ const G4 = 392
 const G5 = 783.99
 const C5 = 523.25
 const C6 = 1046.5
-
-// ── Preset variants ─────────────────────────────────────────────────
 
 export const COMPLETION_SOUND_VARIANTS: readonly CompletionSoundVariant[] = [
   {
@@ -392,57 +405,8 @@ export const COMPLETION_SOUND_VARIANTS: readonly CompletionSoundVariant[] = [
         })
       })
     }
-  },
-  {
-    id: CUSTOM_SOUND_VARIANT_ID,
-    name: 'Rupee fanfare (custom WAV)',
-    play: (_ac, _master, _t0) => {
-      playCustomBuffer()
-    }
   }
 ] as const
-
-export const DEFAULT_COMPLETION_SOUND_VARIANT_ID = 1
-
-export function resolveCompletionSoundVariantId(variantId: number): number {
-  if (!Number.isFinite(variantId)) {
-    return DEFAULT_COMPLETION_SOUND_VARIANT_ID
-  }
-
-  return COMPLETION_SOUND_VARIANTS.some(variant => variant.id === variantId)
-    ? variantId
-    : DEFAULT_COMPLETION_SOUND_VARIANT_ID
-}
-
-// ── Custom WAV loading ──────────────────────────────────────────────
-
-const CUSTOM_SOUND_PATH = '/Users/cremserver/.hermes/sounds/WW_Fanfare_Rupee.wav'
-
-let customAudioUrl: string | null = null
-
-// Called from getCtx() so the preload bridge is guaranteed ready.
-async function initCustomSound() {
-  if (customAudioUrl !== null) return
-  try {
-    customAudioUrl = await window.hermesDesktop.readFileDataUrl(CUSTOM_SOUND_PATH)
-  } catch {
-    customAudioUrl = ''
-  }
-}
-
-function playCustomBuffer() {
-  if (!customAudioUrl) return
-
-  try {
-    const audio = new Audio(customAudioUrl)
-    audio.volume = 0.5
-    void audio.play().catch(() => {})
-  } catch {
-    // silent fail
-  }
-}
-
-// ── Playback ────────────────────────────────────────────────────────
 
 function playVariant(variantId: number) {
   const variant = COMPLETION_SOUND_VARIANTS.find(v => v.id === variantId)
@@ -457,16 +421,7 @@ function playVariant(variantId: number) {
     return
   }
 
-  if (variantId === CUSTOM_SOUND_VARIANT_ID) {
-    // Custom WAV — simpler signal path (no reverb, direct out)
-    const master = ac.createGain()
-    master.gain.setValueAtTime(1.0, ac.currentTime)
-    master.connect(ac.destination)
-    variant.play(ac, master, ac.currentTime + 0.01)
-    return
-  }
-
-  // Synthesized preset signal path: voices → master → low-pass → (dry + reverb send) → out
+  // Signal path: voices → master → low-pass → (dry + reverb send) → out.
   const master = ac.createGain()
   const tone = ac.createBiquadFilter()
   tone.type = 'lowpass'
@@ -490,10 +445,13 @@ function playVariant(variantId: number) {
   variant.play(ac, master, ac.currentTime + 0.01)
 }
 
+// Audition the selected variant from settings. Bypasses the haptics mute toggle so
+// sound design can be compared even when turn-end cues are silenced.
 export function previewCompletionSound(variantId?: number) {
   playVariant(resolveCompletionSoundVariantId(variantId ?? $completionSoundVariantId.get()))
 }
 
+// Plays the selected completion cue on any `message.complete`.
 export function playCompletionSound() {
   if ($hapticsMuted.get()) {
     return
@@ -501,8 +459,6 @@ export function playCompletionSound() {
 
   playVariant($completionSoundVariantId.get())
 }
-
-// ── Types ───────────────────────────────────────────────────────────
 
 interface AirPuffSpec {
   decay: number
@@ -560,10 +516,4 @@ interface WhooshSpec {
   gain: number
   q?: number
   start?: number
-}
-
-interface CompletionSoundVariant {
-  id: number
-  name: string
-  play: (ac: AudioContext, master: GainNode, t0: number) => void
 }
