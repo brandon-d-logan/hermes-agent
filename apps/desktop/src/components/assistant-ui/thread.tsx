@@ -96,6 +96,7 @@ import { extractPreviewTargets } from '@/lib/preview-targets'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
 import { playSpeechText, stopVoicePlayback } from '@/lib/voice-playback'
+import { $compactionActive } from '@/store/compaction'
 import type { ComposerAttachment } from '@/store/composer'
 import { notifyError } from '@/store/notifications'
 import { $connection } from '@/store/session'
@@ -296,10 +297,7 @@ const AssistantMessage: FC<{ onBranchInNewChat?: (messageId: string) => void }> 
     return pickPrimaryPreviewTarget(extractPreviewTargets(completedText))
   }, [completedText])
 
-  const getMessageText = useCallback(
-    () => messageContentText(messageRuntime.getState().content),
-    [messageRuntime]
-  )
+  const getMessageText = useCallback(() => messageContentText(messageRuntime.getState().content), [messageRuntime])
 
   const enterRef = useEnterAnimation(isRunning, `assistant-message:${messageId}`)
 
@@ -365,13 +363,25 @@ const StatusRow: FC<{ children: ReactNode; label: string } & React.ComponentProp
   </div>
 )
 
+// Fixed label while auto-compaction runs — decoupled from backend status text.
+const COMPACTION_LABEL = 'Summarizing thread'
+
+const CompactionHint: FC = () => (
+  <span className="shimmer min-w-0 truncate text-muted-foreground/55">{COMPACTION_LABEL}</span>
+)
+
 const ResponseLoadingIndicator: FC = () => {
   const { t } = useI18n()
   const elapsed = useElapsedSeconds()
+  const compacting = useStore($compactionActive)
 
   return (
-    <StatusRow data-slot="aui_response-loading" label={t.assistant.thread.loadingResponse}>
+    <StatusRow
+      data-slot="aui_response-loading"
+      label={compacting ? COMPACTION_LABEL : t.assistant.thread.loadingResponse}
+    >
       <span aria-hidden="true" className="dither inline-block size-3 rounded-[2px] text-midground/80 animate-pulse" />
+      {compacting && <CompactionHint />}
       <ActivityTimerText seconds={elapsed} />
     </StatusRow>
   )
@@ -406,6 +416,7 @@ const StreamStallIndicator: FC = () => {
   })
 
   const [stalled, setStalled] = useState(false)
+  const compacting = useStore($compactionActive)
 
   useEffect(() => {
     setStalled(false)
@@ -414,15 +425,21 @@ const StreamStallIndicator: FC = () => {
     return () => window.clearTimeout(id)
   }, [activity])
 
-  const elapsed = useElapsedSeconds(stalled)
+  const active = stalled || compacting
+  const elapsed = useElapsedSeconds(active)
 
-  if (!stalled) {
+  if (!active) {
     return null
   }
 
   return (
-    <StatusRow className="mt-1.5" data-slot="aui_stream-stall" label="Hermes is thinking">
+    <StatusRow
+      className="mt-1.5"
+      data-slot="aui_stream-stall"
+      label={compacting ? COMPACTION_LABEL : 'Hermes is thinking'}
+    >
       <span aria-hidden="true" className="dither inline-block size-3 rounded-[2px] text-midground/80 animate-pulse" />
+      {compacting && <CompactionHint />}
       <ActivityTimerText seconds={elapsed} />
     </StatusRow>
   )
