@@ -1,7 +1,7 @@
 // Completion sound bank for agent turn-end cues.
 // Fourteen curated presets for A/B in Settings → Appearance. Default is variant 1.
 
-import { $completionSoundVariantId, resolveCompletionSoundVariantId } from '@/store/completion-sound'
+import { CUSTOM_SOUND_VARIANT_ID, $completionSoundVariantId, resolveCompletionSoundVariantId } from '@/store/completion-sound'
 import { $hapticsMuted } from '@/store/haptics'
 
 type OscType = OscillatorType
@@ -405,6 +405,13 @@ export const COMPLETION_SOUND_VARIANTS: readonly CompletionSoundVariant[] = [
         })
       })
     }
+  },
+  {
+    id: CUSTOM_SOUND_VARIANT_ID,
+    name: 'Rupee fanfare (custom WAV)',
+    play: (_ac, _master, _t0) => {
+      void playCustomWav()
+    }
   }
 ] as const
 
@@ -516,4 +523,49 @@ interface WhooshSpec {
   gain: number
   q?: number
   start?: number
+}
+
+// ── Custom WAV sound (Rupee fanfare) ─────────────────────────────────
+
+let customWavBuffer: AudioBuffer | null = null
+let customWavLoading: Promise<void> | null = null
+
+const CUSTOM_WAV_PATH = '~/.hermes/sounds/WW_Fanfare_Rupee.wav'
+
+async function loadCustomWav(): Promise<void> {
+  try {
+    const ac = getCtx()
+    if (!ac) return
+    const bridge = (window as unknown as Record<string, unknown>).hermesDesktop as
+      | { readFileDataUrl?: (path: string) => Promise<string> }
+      | undefined
+    if (!bridge?.readFileDataUrl) return
+    const dataUrl = await bridge.readFileDataUrl(CUSTOM_WAV_PATH)
+    const response = await fetch(dataUrl)
+    const arrayBuffer = await response.arrayBuffer()
+    customWavBuffer = await ac.decodeAudioData(arrayBuffer)
+  } catch {
+    customWavBuffer = null
+  }
+}
+
+export async function initCustomSound(): Promise<void> {
+  if (!customWavLoading) {
+    customWavLoading = loadCustomWav()
+  }
+  return customWavLoading
+}
+
+async function playCustomWav(): Promise<void> {
+  await initCustomSound()
+  if (!customWavBuffer) return
+  const ac = getCtx()
+  if (!ac) return
+  const source = ac.createBufferSource()
+  source.buffer = customWavBuffer
+  const gain = ac.createGain()
+  gain.gain.setValueAtTime(0.6, ac.currentTime)
+  source.connect(gain)
+  gain.connect(ac.destination)
+  source.start(ac.currentTime + 0.01)
 }
