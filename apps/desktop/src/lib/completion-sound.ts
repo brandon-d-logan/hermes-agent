@@ -544,7 +544,8 @@ async function loadCustomWav(): Promise<void> {
     const response = await fetch(dataUrl)
     const arrayBuffer = await response.arrayBuffer()
     customWavBuffer = await ac.decodeAudioData(arrayBuffer)
-  } catch {
+  } catch (err) {
+    console.warn('[completion-sound] Failed to load custom WAV:', err)
     customWavBuffer = null
   }
 }
