@@ -528,8 +528,12 @@ class TestMessageStorage:
 
         db.append_message("s1", role="user", content="Hello", timestamp=event_ts)
 
-        messages = db.get_messages_as_conversation("s1")
-        assert messages[0]["timestamp"] == event_ts
+        # Timestamp is a DB-internal field, intentionally excluded from the
+        # get_messages_as_conversation() output (OpenAI message format) to
+        # avoid leaking non-standard fields into API calls. Verify via
+        # get_messages() which returns raw row dicts.
+        raw = db.get_messages("s1")
+        assert raw[0]["timestamp"] == event_ts
 
     def test_message_increments_session_count(self, db):
         db.create_session(session_id="s1", source="cli")
@@ -557,7 +561,10 @@ class TestMessageStorage:
         assert conversation[0]["role"] == "user"
         assert conversation[0]["content"] == "[Alice|111]\nside chatter"
         assert conversation[0]["observed"] is True
-        assert isinstance(conversation[0].get("timestamp"), float)
+        # timestamp is intentionally excluded from get_messages_as_conversation
+        # output — it's a DB-internal field. Verify via get_messages().
+        raw = db.get_messages("s1")
+        assert isinstance(raw[0].get("timestamp"), float)
         assert "observed" not in conversation[1]
 
     def test_tool_response_does_not_increment_tool_count(self, db):
@@ -643,7 +650,8 @@ class TestMessageStorage:
         assert len(conv) == 1
         assert conv[0]["role"] == "user"
         assert conv[0]["content"] == content
-        assert isinstance(conv[0].get("timestamp"), float)
+        # timestamp intentionally excluded from conversation format — DB-internal field
+        assert "timestamp" not in conv[0]
 
     def test_dict_content_round_trip(self, db):
         """Dict-shaped content (e.g. provider wrappers) also round-trips."""
@@ -716,10 +724,11 @@ class TestMessageStorage:
         assert len(conv) == 2
         assert conv[0]["role"] == "user"
         assert conv[0]["content"] == "Hello"
-        assert isinstance(conv[0]["timestamp"], float)
+        # timestamp intentionally excluded from conversation format
+        assert "timestamp" not in conv[0]
         assert conv[1]["role"] == "assistant"
         assert conv[1]["content"] == "Hi!"
-        assert isinstance(conv[1]["timestamp"], float)
+        assert "timestamp" not in conv[1]
 
     def test_platform_message_id_round_trips(self, db):
         """Platform-side message ids (yuanbao msg_id, telegram update_id, …)
@@ -812,7 +821,8 @@ class TestMessageStorage:
         assert len(conv) == 1
         assert conv[0]["role"] == "assistant"
         assert conv[0]["content"] == "Visible answer"
-        assert isinstance(conv[0].get("timestamp"), float)
+        # timestamp intentionally excluded from conversation format — DB-internal field
+        assert "timestamp" not in conv[0]
 
     def test_reasoning_persisted_and_restored(self, db):
         """Reasoning text is stored for assistant messages and restored by

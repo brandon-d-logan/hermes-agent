@@ -3111,8 +3111,12 @@ class SessionDB:
             if row["role"] in {"user", "assistant"} and isinstance(content, str):
                 content = sanitize_context(content).strip()
             msg = {"role": row["role"], "content": content}
-            if row["timestamp"]:
-                msg["timestamp"] = row["timestamp"]
+            # NOTE: timestamp is intentionally NOT forwarded here.
+            # It's a DB-internal ordering field that was leaking into API
+            # message payloads, where providers like opencode-zen reject
+            # it as an extra field ("Extra inputs are not permitted").
+            # The desktop UI gets its timestamps via get_messages() (web
+            # API path), not this conversation format method.
             if row["tool_call_id"]:
                 msg["tool_call_id"] = row["tool_call_id"]
             if row["tool_name"]:

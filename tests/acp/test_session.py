@@ -214,7 +214,8 @@ class TestListAndCleanup:
         assert len(messages) == 1
         assert messages[0]["role"] == "user"
         assert messages[0]["content"] == "original"
-        assert isinstance(messages[0].get("timestamp"), (int, float))
+        # timestamp intentionally excluded from conversation format — DB-internal field
+        assert "timestamp" not in messages[0]
 
     def test_cleanup_clears_all(self, manager):
         s1 = manager.create_session()
@@ -505,7 +506,8 @@ class TestPersistence:
         restored = manager.get_session(state.session_id)
         assert restored is not None
         msg = restored.history[0]
-        assert isinstance(msg.pop("timestamp", None), (int, float))
+        # timestamp intentionally excluded from get_messages_as_conversation output
+        assert "timestamp" not in msg
         assert restored.history == [{
             "role": "assistant",
             "content": "hello",
