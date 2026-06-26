@@ -249,6 +249,50 @@ class TestWebServerEndpoints:
         assert "active_sessions" in data
         assert data["can_update_hermes"] is True
 
+    def test_gateway_drain_begin_writes_marker(self):
+        from gateway import drain_control
+
+        resp = self.client.post("/api/gateway/drain", json={"action": "drain"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True and data["action"] == "drain"
+        assert data["draining"] is True
+        assert drain_control.drain_requested() is True
+        # cleanup
+        drain_control.clear_drain_request()
+
+    def test_gateway_drain_defaults_to_begin(self):
+        from gateway import drain_control
+
+        resp = self.client.post("/api/gateway/drain", json={})
+        assert resp.status_code == 200
+        assert resp.json()["action"] == "drain"
+        assert drain_control.drain_requested() is True
+        drain_control.clear_drain_request()
+
+    def test_gateway_drain_cancel_removes_marker(self):
+        from gateway import drain_control
+
+        drain_control.write_drain_request()
+        resp = self.client.post("/api/gateway/drain", json={"action": "cancel"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] is True and data["action"] == "cancel"
+        assert data["was_draining"] is True
+        assert drain_control.drain_requested() is False
+
+    def test_gateway_drain_cancel_idempotent(self):
+        from gateway import drain_control
+
+        resp = self.client.post("/api/gateway/drain", json={"action": "cancel"})
+        assert resp.status_code == 200
+        assert resp.json()["was_draining"] is False
+        assert drain_control.drain_requested() is False
+
+    def test_gateway_drain_bad_action_400(self):
+        resp = self.client.post("/api/gateway/drain", json={"action": "explode"})
+        assert resp.status_code == 400
+
     def test_get_status_hides_update_capability_in_managed_runtime(self, monkeypatch):
         import hermes_cli.web_server as web_server
 
@@ -392,6 +436,36 @@ class TestWebServerEndpoints:
         assert fields["api_key"]["is_set"] is True
         assert fields["api_key"]["value"] == ""
         assert "secret-value" not in json.dumps(data)
+
+    def test_get_moa_models_returns_provider_model_slots(self):
+        resp = self.client.get("/api/model/moa")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["reference_models"]
+        assert all(set(slot) == {"provider", "model"} for slot in data["reference_models"])
+        assert set(data["aggregator"]) == {"provider", "model"}
+
+    def test_put_moa_models_persists_provider_model_slots(self):
+        from hermes_cli.config import load_config
+
+        payload = {
+            "reference_models": [
+                {"provider": "openai-codex", "model": "gpt-5.5"},
+                {"provider": "openrouter", "model": "deepseek/deepseek-v4-pro"},
+            ],
+            "aggregator": {"provider": "openrouter", "model": "anthropic/claude-opus-4.8"},
+            "reference_temperature": 0.6,
+            "aggregator_temperature": 0.4,
+            "max_tokens": 4096,
+            "enabled": True,
+        }
+
+        resp = self.client.put("/api/model/moa", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        cfg = load_config()
+        assert cfg["moa"]["reference_models"] == payload["reference_models"]
+        assert cfg["moa"]["aggregator"] == payload["aggregator"]
 
     # ── GET /api/media (remote image display) ───────────────────────────
 
@@ -5095,8 +5169,14 @@ class TestPluginAPIAuth:
     """Tests that plugin API routes require the session token (issue #19533)."""
 
     @pytest.fixture(autouse=True)
-    def _setup_test_client(self, monkeypatch, _isolate_hermes_home):
-        """Create TestClients with and without the session token header."""
+    def _setup_test_client(self, monkeypatch, _isolate_hermes_home, _install_example_plugin):
+        """Create a TestClient without the session token header.
+
+        Pulls in ``_install_example_plugin`` so ``test_plugin_route_allows_auth``
+        has the ``/api/plugins/example/hello`` endpoint available — the
+        example plugin is no longer a bundled plugin, so the fixture
+        installs it into the per-test ``HERMES_HOME``.
+        """
         try:
             from starlette.testclient import TestClient
         except ImportError:
@@ -5121,15 +5201,19 @@ class TestPluginAPIAuth:
     def test_plugin_route_allows_auth(self):
         """Plugin API routes should work with a valid session token.
 
-        Uses a bundled plugin route so the test covers authenticated plugin
-        API access without relying on user-installed plugin backend imports.
+        Uses ``/api/plugins/example/hello`` from the example-dashboard
+        test fixture (installed into HERMES_HOME by the class-level
+        ``_install_example_plugin`` fixture) — a stable, side-effect-free
+        GET that's only loaded for tests. With a valid token the handler
+        should run (200); without one the middleware should 401 before
+        the handler is reached.
         """
         # Without auth: middleware blocks before reaching the handler.
-        resp = self.client.get("/api/plugins/kanban/board")
+        resp = self.client.get("/api/plugins/example/hello")
         assert resp.status_code == 401
 
         # With auth: handler runs.
-        resp = self.auth_client.get("/api/plugins/kanban/board")
+        resp = self.auth_client.get("/api/plugins/example/hello")
         assert resp.status_code == 200
 
     def test_plugin_post_requires_auth(self):
