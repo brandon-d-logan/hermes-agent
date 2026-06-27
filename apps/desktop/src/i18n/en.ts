@@ -379,6 +379,13 @@ export const en: Translations = {
       completionSoundTitle: 'Completion Sound',
       completionSoundDesc: 'Choose a chime that plays when Hermes finishes responding. The Rupee option plays your custom WAV from ~/.hermes/sounds/.',
       completionSoundPreview: 'Preview',
+      embedsTitle: 'Inline Embeds',
+      embedsDesc:
+        'Rich previews load from third-party sites (YouTube, X, …). Ask shows a placeholder until you allow each one; Always loads them automatically; Off keeps plain links.',
+      embedsAsk: 'Ask',
+      embedsAlways: 'Always',
+      embedsOff: 'Off',
+      embedsReset: (count: number) => `Reset ${count} allowed ${count === 1 ? 'service' : 'services'}`,
       product: 'Product',
       productDesc: 'Human-friendly tool activity with concise summaries.',
       technical: 'Technical',
@@ -2031,10 +2038,8 @@ export const en: Translations = {
       loadingQuestion: 'Loading question…',
       other: 'Other (type your answer)',
       placeholder: 'Type your answer…',
-      shortcutSuffix: ' to send',
-      back: 'Back',
       skip: 'Skip',
-      send: 'Send'
+      continueLabel: 'Continue'
     },
     tool: {
       code: 'Code',
