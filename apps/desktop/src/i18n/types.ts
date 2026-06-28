@@ -1718,6 +1718,7 @@ export interface Translations {
         reading: string
         opened: string
         opening: string
+        failedToOpen: string
         searched: string
         searching: string
         ran: string
