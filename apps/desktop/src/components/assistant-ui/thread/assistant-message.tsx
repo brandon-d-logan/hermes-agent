@@ -7,7 +7,7 @@ import {
   useMessageRuntime
 } from '@assistant-ui/react'
 import { useStore } from '@nanostores/react'
-import { type FC, useCallback, useMemo, useState } from 'react'
+import { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   contentHasVisibleText,
@@ -133,6 +133,7 @@ export const AssistantMessage: FC<{
           </ErrorPrimitive.Root>
         </MessagePrimitive.Error>
       </div>
+      <MessageCompletionTime />
       {hasVisibleText && (
         <AssistantFooter getMessageText={getMessageText} messageId={messageId} onBranchInNewChat={onBranchInNewChat} />
       )}
@@ -253,6 +254,55 @@ const MessageTimestampInline: FC = () => {
     <span className="text-[0.68rem] leading-none text-(--ui-text-tertiary) select-none">
       {label}
     </span>
+  )
+}
+
+/** Completion timestamp shown below the response content.
+ *
+ * Captures the wall-clock time when the message status transitions from
+ * ``"running"`` to ``"complete"``, plus the elapsed duration.  Rendered
+ * as a subtle dimmed line between the content and the action footer.
+ *
+ * Once captured the value is frozen — it won't drift on re-renders. */
+const MessageCompletionTime: FC = () => {
+  const messageStatus = useAuiState(s => s.message.status?.type)
+  const createdAt = useAuiState(s => s.message.createdAt)
+  const wasRunning = useRef(false)
+  const [completionTime, setCompletionTime] = useState<number | null>(null)
+
+  // Capture completion time on first transition out of "running".
+  useEffect(() => {
+    if (messageStatus === 'running') {
+      wasRunning.current = true
+    } else if (wasRunning.current && completionTime === null && messageStatus === 'complete') {
+      setCompletionTime(Date.now())
+    }
+  }, [messageStatus, completionTime])
+
+  // Only show once we have a captured completion time, and only when
+  // a creation timestamp exists to form the range.
+  if (!completionTime || !createdAt) {
+    return null
+  }
+
+  const startDate = createdAt instanceof Date ? createdAt : new Date(createdAt)
+  const elapsed = Math.round((completionTime - startDate.getTime()) / 1000)
+  const elapsedStr = elapsed >= 60
+    ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+    : `${elapsed}s`
+
+  const completed = new Date(completionTime)
+  const timeStr = formatMessageTimestamp(completed, {
+    today: (time) => time,
+    yesterday: (time) => time
+  })
+
+  return (
+    <div className="flex items-center gap-2 px-(--message-text-indent) pt-1.5 pb-0">
+      <span className="text-[0.68rem] leading-none text-(--ui-text-tertiary)/60 select-none">
+        {timeStr}  ({elapsedStr})
+      </span>
+    </div>
   )
 }
 
