@@ -97,6 +97,9 @@ export const AssistantMessage: FC<{
       data-streaming={isRunning ? 'true' : undefined}
       ref={enterRef}
     >
+      <div className="flex items-center gap-2 px-(--message-text-indent) pb-0.5">
+        <MessageTimestampInline />
+      </div>
       <div
         className="wrap-anywhere min-w-0 max-w-full overflow-hidden text-pretty text-[length:var(--conversation-text-font-size)] leading-(--dt-line-height) text-foreground"
         data-slot="aui_assistant-message-content"
@@ -235,6 +238,22 @@ const MessageTimestamp: FC = () => {
   }
 
   return <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{label}</DropdownMenuLabel>
+}
+
+const MessageTimestampInline: FC = () => {
+  const { t } = useI18n()
+  const createdAt = useAuiState(s => s.message.createdAt)
+  const label = formatMessageTimestamp(createdAt, t.assistant.thread)
+
+  if (!label) {
+    return null
+  }
+
+  return (
+    <span className="text-[0.68rem] leading-none text-(--ui-text-tertiary) select-none">
+      {label}
+    </span>
+  )
 }
 
 const AssistantFooter: FC<MessageActionProps> = props => (

@@ -1,6 +1,7 @@
 import { ActionBarPrimitive, BranchPickerPrimitive, MessagePrimitive, useAuiState } from '@assistant-ui/react'
 import { type FC, type ReactNode, useCallback, useRef, useState } from 'react'
 
+import { formatMessageTimestamp } from '@/components/assistant-ui/thread/timestamp'
 import { DirectiveContent } from '@/components/assistant-ui/directive-text'
 import { messageAttachmentRefs, messageContentText } from '@/components/assistant-ui/thread/content'
 import { type RestoreMessageTarget } from '@/components/assistant-ui/thread/types'
@@ -144,6 +145,8 @@ export const UserMessage: FC<{
     return messageAttachmentRefs(custom.attachmentRefs)
   })
 
+  const createdAt = useAuiState(s => s.message.createdAt)
+
   // Sticky human bubbles clamp to ~2 lines with a soft fade so a long prompt
   // doesn't dominate the viewport while the response streams underneath; the
   // clamp lifts on hover / focus (see styles.css). We measure the *unclamped*
@@ -227,17 +230,22 @@ export const UserMessage: FC<{
     // Render the user's text through a minimal markdown pipeline:
     // backtick `code` and ``` fenced ``` blocks, with directive chips
     // (`@file:` etc.) still resolved inside the plain-text spans.
-    <div
-      className={cn(clampActive && 'sticky-human-clamp')}
-      data-clamped={clampActive && bodyClamped ? 'true' : undefined}
-    >
-      {/* Match the edit composer's collapsed line box (min-h-[1.25rem]) so
-          clicking to edit can't grow the bubble by a sub-pixel and reflow the
-          turn 1px. */}
-      <div className="min-h-[1.25rem]" ref={clampInnerRef}>
-        <UserMessageText className="wrap-anywhere" text={messageText} />
+    <>
+      <div className="flex justify-end pb-1">
+        <UserMessageTimestampInline createdAt={createdAt} />
       </div>
-    </div>
+      <div
+        className={cn(clampActive && 'sticky-human-clamp')}
+        data-clamped={clampActive && bodyClamped ? 'true' : undefined}
+      >
+        {/* Match the edit composer's collapsed line box (min-h-[1.25rem]) so
+            clicking to edit can't grow the bubble by a sub-pixel and reflow the
+            turn 1px. */}
+        <div className="min-h-[1.25rem]" ref={clampInnerRef}>
+          <UserMessageText className="wrap-anywhere" text={messageText} />
+        </div>
+      </div>
+    </>
   )
 
   return (
@@ -363,5 +371,20 @@ export const UserMessage: FC<{
         </ActionBarPrimitive.Root>
       </StickyHumanMessageContainer>
     </MessagePrimitive.Root>
+  )
+}
+
+const UserMessageTimestampInline: FC<{ createdAt: Date | string | number | undefined }> = ({ createdAt }) => {
+  const { t } = useI18n()
+  const label = formatMessageTimestamp(createdAt, t.assistant.thread)
+
+  if (!label) {
+    return null
+  }
+
+  return (
+    <span className="text-[0.68rem] leading-none text-(--ui-text-tertiary) select-none">
+      {label}
+    </span>
   )
 }
