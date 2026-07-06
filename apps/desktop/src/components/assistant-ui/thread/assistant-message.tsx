@@ -97,9 +97,6 @@ export const AssistantMessage: FC<{
       data-streaming={isRunning ? 'true' : undefined}
       ref={enterRef}
     >
-      <div className="flex items-center gap-2 px-(--message-text-indent) pb-0.5">
-        <MessageTimestampInline />
-      </div>
       <div
         className="wrap-anywhere min-w-0 max-w-full overflow-hidden text-pretty text-[length:var(--conversation-text-font-size)] leading-(--dt-line-height) text-foreground"
         data-slot="aui_assistant-message-content"
@@ -132,6 +129,9 @@ export const AssistantMessage: FC<{
             )}
           </ErrorPrimitive.Root>
         </MessagePrimitive.Error>
+      </div>
+      <div className="flex items-center gap-2 px-(--message-text-indent) pt-0.5 pb-0">
+        <MessageTimestampInline />
       </div>
       <MessageCompletionTime />
       {hasVisibleText && (

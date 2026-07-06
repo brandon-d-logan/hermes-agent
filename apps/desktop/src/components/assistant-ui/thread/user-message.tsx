@@ -231,9 +231,6 @@ export const UserMessage: FC<{
     // backtick `code` and ``` fenced ``` blocks, with directive chips
     // (`@file:` etc.) still resolved inside the plain-text spans.
     <>
-      <div className="flex justify-end pb-1">
-        <UserMessageTimestampInline createdAt={createdAt} />
-      </div>
       <div
         className={cn(clampActive && 'sticky-human-clamp')}
         data-clamped={clampActive && bodyClamped ? 'true' : undefined}
@@ -244,6 +241,9 @@ export const UserMessage: FC<{
         <div className="min-h-[1.25rem]" ref={clampInnerRef}>
           <UserMessageText className="wrap-anywhere" text={messageText} />
         </div>
+      </div>
+      <div className="flex justify-start pt-0.5">
+        <UserMessageTimestampInline createdAt={createdAt} />
       </div>
     </>
   )
