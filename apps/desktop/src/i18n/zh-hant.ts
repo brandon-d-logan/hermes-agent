@@ -116,6 +116,7 @@ export const zhHant = defineLocale({
     copyDetailFailed: '無法複製通知詳情',
     backendOutOfDateTitle: '後端版本過舊',
     backendOutOfDateMessage: '您的 Hermes 後端早於目前的桌面版本，可能無法正常運作。請更新以保持一致。',
+    installMethodUnsupportedTitle: '不受支援的安裝方式',
     updateHermes: '更新 Hermes',
     updateReadyTitle: '有可用更新',
     updateReadyMessage: count => `有 ${count} 項新變更可用。`,
@@ -282,6 +283,9 @@ export const zhHant = defineLocale({
       completionSoundTitle: 'Completion Sound',
       completionSoundDesc: 'Choose a chime that plays when Hermes finishes responding.',
       completionSoundPreview: 'Preview',
+      uiScaleTitle: '介面縮放',
+      uiScaleDesc: (percent: number) =>
+        `縮放整個應用程式的文字與介面。也可使用 Cmd/Ctrl 加 +、- 或 0 調整。目前：${percent}%`,
       translucencyTitle: '視窗透明',
       translucencyDesc: '讓整個視窗透出桌面。僅支援 macOS 與 Windows。',
       embedsTitle: '內嵌預覽',

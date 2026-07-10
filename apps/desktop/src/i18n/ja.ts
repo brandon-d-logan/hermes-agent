@@ -120,6 +120,7 @@ export const ja = defineLocale({
     backendOutOfDateTitle: 'バックエンドが古いです',
     backendOutOfDateMessage:
       'Hermes バックエンドがこのデスクトップビルドより古く、正常に動作しない場合があります。更新して揃えてください。',
+    installMethodUnsupportedTitle: 'サポート対象外のインストール方法',
     updateHermes: 'Hermes を更新',
     updateReadyTitle: '更新の準備ができました',
     updateReadyMessage: count => `${count} 件の新しい変更が利用可能です。`,
@@ -290,6 +291,9 @@ export const ja = defineLocale({
       completionSoundTitle: 'Completion Sound',
       completionSoundDesc: 'Choose a chime that plays when Hermes finishes responding.',
       completionSoundPreview: 'Preview',
+      uiScaleTitle: 'UI スケール',
+      uiScaleDesc: (percent: number) =>
+        `アプリ全体の文字と UI を拡大縮小します。Cmd/Ctrl と +、-、0 でも変更できます。現在: ${percent}%`,
       translucencyTitle: 'ウィンドウの透過',
       translucencyDesc: 'ウィンドウ全体を透過させてデスクトップを表示します。macOS と Windows のみ。',
       embedsTitle: 'インライン埋め込み',
