@@ -407,7 +407,7 @@ export const COMPLETION_SOUND_VARIANTS: readonly CompletionSoundVariant[] = [
         })
       })
     }
-  }
+  },
   {
     id: CUSTOM_SOUND_VARIANT_ID,
     name: 'Rupee fanfare (custom WAV)',

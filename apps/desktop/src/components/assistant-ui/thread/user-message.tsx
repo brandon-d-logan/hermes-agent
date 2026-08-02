@@ -116,6 +116,10 @@ export const UserMessage: FC<{
   const messageId = useAuiState(s => s.message.id)
   const content = useAuiState(s => s.message.content)
   const messageText = messageContentText(content)
+  // Drives the inline timestamp under the bubble. Read through the same
+  // useAuiState channel as the rest of the message fields so it re-renders
+  // when the runtime backfills the date on a freshly-sent prompt.
+  const createdAt = useAuiState(s => s.message.createdAt)
   const threadRunning = useAuiState(s => s.thread.isRunning)
 
   const latestUserId = useAuiState(s => {
@@ -164,7 +168,6 @@ export const UserMessage: FC<{
     },
     [react]
   )
->>>>>>> origin/main
 
   // Sticky human bubbles clamp to ~2 lines with a soft fade so a long prompt
   // doesn't dominate the viewport while the response streams underneath; the
