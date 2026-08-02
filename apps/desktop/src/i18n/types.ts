@@ -174,6 +174,7 @@ export interface Translations {
     errors: {
       elevenLabsNeedsKey: string
       elevenLabsRejectedKey: string
+      diskFull: string
       gatewayAuthFailed: string
       methodNotAllowed: string
       microphonePermission: string
@@ -347,6 +348,11 @@ export interface Translations {
       toolViewDesc: string
       uiScaleTitle: string
       uiScaleDesc: (percent: number) => string
+      terminalFontTitle: string
+      terminalFontDesc: string
+      terminalFontPlaceholder: string
+      terminalFontPreview: string
+      terminalFontReset: string
       translucencyTitle: string
       translucencyDesc: string
       completionSoundTitle: string
@@ -608,6 +614,8 @@ export interface Translations {
       sshHermesPathTitle: string
       sshHermesPathDesc: string
       sshHermesPathPlaceholder: string
+      sshRemoteProfileTitle: string
+      sshRemoteProfileDesc: string
       sshTestConnection: string
       sshConnect: string
       sshButtonsHint: string
@@ -1657,6 +1665,7 @@ export interface Translations {
     newSessionPlaceholders: readonly string[]
     followUpPlaceholders: readonly string[]
     startVoice: string
+    openDirective: string
     queueMessage: string
     steer: string
     stop: string
