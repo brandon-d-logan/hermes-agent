@@ -58,6 +58,10 @@ jobs:
   # by both route matrices, so the two routes cover the same set.
   pick-releases:
     name: Pick release tags
+    # Releases/E2E only make sense on the upstream repository, which carries the
+    # release tags; forks have none, so pick-release-tags.sh would exit non-zero
+    # on every scheduled run.
+    if: github.repository == 'NousResearch/hermes-agent'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
