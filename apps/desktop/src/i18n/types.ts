@@ -170,6 +170,7 @@ export interface Translations {
     updateHermes: string
     updateReadyTitle: string
     updateReadyMessage: (count: number) => string
+    updateReadyMessageUnknown: string
     seeWhatsNew: string
     errors: {
       elevenLabsNeedsKey: string
@@ -453,6 +454,7 @@ export interface Translations {
       cantReach: string
       tapCheck: string
       updateReady: (count: number) => string
+      updateReadyUnknown: string
       lastChecked: (age: string) => string
       justNowSuffix: string
       automaticUpdates: string
@@ -878,6 +880,7 @@ export interface Translations {
   skills: {
     tabSkills: string
     tabToolsets: string
+    configuringProfile: string
     tabMcp: string
     tabHub: string
     all: string
@@ -1665,6 +1668,7 @@ export interface Translations {
       rename: string
       archive: string
       newWindow: string
+      openInTerminal: string
       hideTabBar: string
       openInNewTab: string
       openInSplit: string
@@ -2156,6 +2160,7 @@ export interface Translations {
       gatewayTitle: string
       customizeTitle: string
       hideStatusbar: string
+      resetStatusbar: string
       toggleApprovalMode: string
       toggleBackendVersion: string
       toggleCommandCenter: string
