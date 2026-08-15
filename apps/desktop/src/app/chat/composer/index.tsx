@@ -1242,7 +1242,7 @@ export function ChatBar({
                     composerSurfaceGlass
                   )}
                 />
-                <CodingStatusRow
+                {window.localStorage?.getItem?.('hermes.desktop.showCodingRow') === 'true' && <CodingStatusRow
                   onBranchOff={handleBranchOff}
                   onConvertBranch={handleConvertBranch}
                   onListBranches={handleListBranches}
@@ -1253,7 +1253,7 @@ export function ChatBar({
                   onOpenWorktree={openInWorktree}
                   onSwitchBranch={handleSwitchBranch}
                   repoPath={cwd}
-                />
+                />}
                 <div
                   className={cn(
                     'relative z-1 flex min-h-0 w-full flex-col gap-(--composer-row-gap) overflow-hidden rounded-[inherit] px-(--composer-surface-pad-x) py-(--composer-surface-pad-y) transition-opacity duration-200 ease-out',
