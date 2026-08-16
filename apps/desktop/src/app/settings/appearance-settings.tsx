@@ -550,8 +550,6 @@ export function AppearanceSettings() {
 
           <ListRow
             action={
-          <ListRow
-            action={
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Select
                   onValueChange={value => {
@@ -612,7 +610,6 @@ export function AppearanceSettings() {
             }
             description={a.reasoningCollapsedDesc}
             title={a.reasoningCollapsedTitle}
-          />
           />
 
           <ListRow
