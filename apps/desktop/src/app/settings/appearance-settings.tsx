@@ -16,9 +16,12 @@ import { normalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
 import { $completionSoundVariantId, setCompletionSoundVariantId } from '@/store/completion-sound'
 import { $backdrop, setBackdrop } from '@/store/backdrop'
+import { $composerPopoutGesturesEnabled, setComposerPopoutGesturesEnabled } from '@/store/composer-popout'
 import { $embedAllowed, $embedMode, clearEmbedAllowed, type EmbedMode, setEmbedMode } from '@/store/embed-consent'
 import { $activeGatewayProfile, $profiles, normalizeProfileKey } from '@/store/profile'
 import { $reactionsEnabled, setReactionsEnabled } from '@/store/reactions-enabled'
+import { $reasoningCollapsedByDefault, setReasoningCollapsedByDefault } from '@/store/reasoning-disclosure'
+import { $sessionListDensity, type SessionListDensity, setSessionListDensity } from '@/store/session-list-density'
 import { $toolViewMode, setToolViewMode } from '@/store/tool-view'
 import { $translucency, setTranslucency } from '@/store/translucency'
 import { $zoomPercent, setZoomPercent } from '@/store/zoom'
@@ -29,7 +32,7 @@ import { $marketplaceInstalls, isUserTheme, removeUserTheme } from '@/themes/use
 
 import { CONTROL_TEXT, MODE_OPTIONS } from './constants'
 import { PetSettings } from './pet-settings'
-import { ListRow, SectionHeading, SettingsContent } from './primitives'
+import { ListRow, SectionHeading, SettingsContent, ToggleRow } from './primitives'
 import { TerminalFontSetting } from './terminal-font-setting'
 
 function ThemePreview({ name, mode }: { name: string; mode: 'light' | 'dark' }) {
@@ -252,9 +255,12 @@ export function AppearanceSettings() {
   const { themeName, mode, resolvedMode, availableThemes, setTheme, setMode } = useTheme()
   const completionSoundVariantId = useStore($completionSoundVariantId)
   const toolViewMode = useStore($toolViewMode)
+  const reasoningCollapsedByDefault = useStore($reasoningCollapsedByDefault)
+  const sessionListDensity = useStore($sessionListDensity)
   const zoomPercent = useStore($zoomPercent)
   const embedMode = useStore($embedMode)
   const embedAllowed = useStore($embedAllowed)
+  const composerPopoutGesturesEnabled = useStore($composerPopoutGesturesEnabled)
   const translucency = useStore($translucency)
   const reactionsEnabled = useStore($reactionsEnabled)
   const backdrop = useStore($backdrop)
@@ -294,6 +300,12 @@ export function AppearanceSettings() {
     { id: 'product', label: a.product },
     { id: 'technical', label: a.technical }
   ] as const
+
+  const sessionDensityOptions = [
+    { id: 'compact', label: a.sessionDensityCompact },
+    { id: 'comfortable', label: a.sessionDensityComfortable },
+    { id: 'detailed', label: a.sessionDensityDetailed }
+  ] as const satisfies readonly { id: SessionListDensity; label: string }[]
 
   const embedOptions = [
     { id: 'ask', label: a.embedsAsk },
@@ -439,6 +451,21 @@ export function AppearanceSettings() {
 
           <ListRow
             action={
+              <SegmentedControl
+                onChange={id => {
+                  triggerHaptic('selection')
+                  setSessionListDensity(id)
+                }}
+                options={sessionDensityOptions}
+                value={sessionListDensity}
+              />
+            }
+            description={a.sessionDensityDesc}
+            title={a.sessionDensityTitle}
+          />
+
+          <ListRow
+            action={
               <div className="flex items-center gap-3">
                 <input
                   aria-label={a.translucencyTitle}
@@ -481,6 +508,13 @@ export function AppearanceSettings() {
             title={a.backdropTitle}
           />
 
+          <ToggleRow
+            checked={composerPopoutGesturesEnabled}
+            description={a.composerPopoutDesc}
+            label={a.composerPopoutTitle}
+            onChange={setComposerPopoutGesturesEnabled}
+          />
+
           <ListRow
             action={
               <SegmentedControl
@@ -514,6 +548,8 @@ export function AppearanceSettings() {
             title={a.toolViewTitle}
           />
 
+          <ListRow
+            action={
           <ListRow
             action={
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -558,6 +594,25 @@ export function AppearanceSettings() {
             }
             description={a.completionSoundDesc}
             title={a.completionSoundTitle}
+          />
+
+          <ListRow
+            action={
+              <SegmentedControl
+                onChange={id => {
+                  triggerHaptic('selection')
+                  setReasoningCollapsedByDefault(id === 'on')
+                }}
+                options={[
+                  { id: 'off', label: t.common.off },
+                  { id: 'on', label: t.common.on }
+                ]}
+                value={reasoningCollapsedByDefault ? 'on' : 'off'}
+              />
+            }
+            description={a.reasoningCollapsedDesc}
+            title={a.reasoningCollapsedTitle}
+          />
           />
 
           <ListRow
