@@ -2639,6 +2639,37 @@ async function resolveHealedBranch(updateRoot, branch) {
   return 'main'
 }
 
+// The deployed binary's build stamp (install-stamp.json) is the truth of
+// "what's installed", NOT the live checkout HEAD. Worktree deployments (this
+// fork's nightly cron) rebuild from a separate worktree and deploy the .app,
+// leaving the live checkout frozen on an old commit (the runtime guard blocks
+// resets there while Hermes runs). Measuring HEAD would report a giant bogus
+// behind-count for a current binary. Prefer the stamp commit when present in
+// this checkout's object store; fall back to HEAD (normal in-place installs
+// build from the checkout, so stamp and HEAD coincide anyway).
+async function resolveDeployedSha(updateRoot) {
+  const stampPath = IS_PACKAGED
+    ? path.join(process.resourcesPath, 'install-stamp.json')
+    : path.join(APP_ROOT, 'build', 'install-stamp.json')
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(stampPath, 'utf8'))
+    const commit = typeof parsed?.commit === 'string' ? parsed.commit : null
+
+    if (commit) {
+      const probe = await runGit(['cat-file', '-e', `${commit}^{commit}`], { cwd: updateRoot })
+
+      if (probe.code === 0) {
+        return commit
+      }
+    }
+  } catch {
+    // No stamp file or unreadable JSON — fall back to HEAD below.
+  }
+
+  return null
+}
+
 async function checkUpdates() {
   const updateRoot = resolveUpdateRoot()
   let { branch } = readDesktopUpdateConfig()
@@ -2741,16 +2772,22 @@ async function checkUpdates() {
 
   const isShallow = shallowStr === 'true'
 
+  // Measure from the DEPLOYED binary's commit (install-stamp.json), not the
+  // live checkout HEAD — a worktree deployment leaves HEAD stale by design
+  // (see resolveDeployedSha), which would fabricate a huge behind-count.
+  const deployedSha = await resolveDeployedSha(updateRoot)
+  const baseSha = deployedSha || currentSha
+
   // A shallow graph cannot provide a trustworthy exact count, even when it has
   // a visible merge-base. Skip the ancestry walk and use the SHA fallback.
-  const countStr = shouldCountCommits({ isShallow }) ? await git(['rev-list', `HEAD..origin/${branch}`, '--count']) : ''
+  const countStr = shouldCountCommits({ isShallow }) ? await git(['rev-list', `${baseSha}..origin/${branch}`, '--count']) : ''
 
   // A positive directional ancestry result remains trustworthy in a shallow
   // graph and prevents a local commit on top of origin from looking outdated.
   const targetIsAncestorOfHead =
     isShallow &&
     currentSha !== targetSha &&
-    (await runGit(['merge-base', '--is-ancestor', `origin/${branch}`, 'HEAD'], { cwd: updateRoot })).code === 0
+    (await runGit(['merge-base', '--is-ancestor', `origin/${branch}`, baseSha], { cwd: updateRoot })).code === 0
 
   let behind = resolveBehindCount({
     countStr,
@@ -2765,14 +2802,14 @@ async function checkUpdates() {
   // offline, rate-limited, or non-GitHub origins keep the honest null
   // ("update available", no fabricated number).
   if (behind === null) {
-    behind = await fetchCompareBehindCount({ currentSha, originUrl, targetSha })
+    behind = await fetchCompareBehindCount({ currentSha: baseSha, originUrl, targetSha })
   }
 
   // behind === null means "update available, exact count unknown" (shallow
   // clone): still list what origin offers — resolveCommitLogSelection keeps
   // the shallow log to the fetched tip so the range walk can't enumerate the
   // contaminated ancestry — so "See what's new" stays useful and honest.
-  const commits = behind !== 0 ? await readCommitLog(updateRoot, branch, isShallow) : []
+  const commits = behind !== 0 ? await readCommitLog(updateRoot, branch, isShallow, baseSha) : []
 
   return {
     supported: true,
@@ -2843,10 +2880,10 @@ async function fetchCompareBehindCount({ currentSha, originUrl, targetSha }) {
   }
 }
 
-async function readCommitLog(cwd, branch, isShallow) {
+async function readCommitLog(cwd, branch, isShallow, base = 'HEAD') {
   const SEP = '\x1f'
   const REC = '\x1e'
-  const { limit, revision } = resolveCommitLogSelection({ branch, isShallow })
+  const { limit, revision } = resolveCommitLogSelection({ branch, isShallow, base })
 
   const { stdout } = await runGit(
     ['log', revision, `--pretty=format:%H${SEP}%s${SEP}%an${SEP}%at${REC}`, '-n', String(limit)],

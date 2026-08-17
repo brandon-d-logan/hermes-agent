@@ -30,11 +30,13 @@ function resolveBehindCount({ countStr, currentSha, targetSha, isShallow, target
 
 // Shallow history can also contaminate the changelog range. Trust the fetched
 // remote tip itself, but do not walk its ancestry. Full clones retain the
-// detailed range used by the existing update overlay.
-function resolveCommitLogSelection({ branch, isShallow }) {
+// detailed range used by the existing update overlay. `base` lets worktree
+// deployments measure from the deployed binary's stamp commit instead of the
+// (possibly stale) live checkout HEAD.
+function resolveCommitLogSelection({ branch, isShallow, base = 'HEAD' }) {
   const remote = `origin/${branch}`
 
-  return isShallow ? { limit: 1, revision: remote } : { limit: 40, revision: `HEAD..${remote}` }
+  return isShallow ? { limit: 1, revision: remote } : { limit: 40, revision: `${base}..${remote}` }
 }
 
 // When the local graph can't count (behind === null), the GitHub compare API
