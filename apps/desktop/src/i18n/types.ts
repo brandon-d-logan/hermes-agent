@@ -5,6 +5,8 @@
 // partial locales should use `defineLocale()` so missing desktop-only strings
 // fall back to English while new keys remain type-checked.
 
+import type { TipId } from '@/lib/tips/catalog'
+
 export type Locale = 'en' | 'zh' | 'zh-hant' | 'ja' | 'ar'
 
 export type ToolTitleKey =
@@ -481,6 +483,11 @@ export interface Translations {
       introSplashDesc: string
       reactionsTitle: string
       reactionsDesc: string
+      tipsTitle: string
+      tipsDesc: string
+      tipsReset: (count: number) => string
+      toursTitle: string
+      toursDesc: string
       composerPopoutTitle: string
       composerPopoutDesc: string
       vibeHeartsTitle: string
@@ -2931,6 +2938,9 @@ export interface Translations {
     editFailed: string
     editTurnUnavailable: string
     resumeFailed: string
+    readOnlyTranscriptTitle: string
+    readOnlyTranscriptBody: string
+    readOnlyTranscriptSendBlocked: string
     resumeStrandedTitle: string
     resumeStrandedBody: string
     resumeRetry: string
@@ -2975,6 +2985,12 @@ export interface Translations {
       failed: (error: string) => string
       timedOut: string
     }
+  }
+
+  tips: {
+    close: string
+    /** Keyed by `TipId`, so a new tip without copy is a type error. */
+    items: Record<TipId, { title: string; text: string }>
   }
 
   errors: {
