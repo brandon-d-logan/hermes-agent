@@ -515,7 +515,7 @@ const CUSTOM_WAV_PATH = '~/.hermes/sounds/WW_Fanfare_Rupee.wav'
 
 async function loadCustomWav(): Promise<void> {
   try {
-    const ac = getCtx()
+    const ac = getAudioContext()
     if (!ac) return
     const bridge = (window as unknown as Record<string, unknown>).hermesDesktop as
       | { readFileDataUrl?: (path: string) => Promise<string> }
@@ -541,7 +541,7 @@ export async function initCustomSound(): Promise<void> {
 async function playCustomWav(): Promise<void> {
   await initCustomSound()
   if (!customWavBuffer) return
-  const ac = getCtx()
+  const ac = getAudioContext()
   if (!ac) return
   const source = ac.createBufferSource()
   source.buffer = customWavBuffer
