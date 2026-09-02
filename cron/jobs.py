@@ -1213,6 +1213,29 @@ def _compute_grace_seconds(schedule: dict) -> int:
     return max(MIN_GRACE, min(grace, MAX_GRACE))
 
 
+# Missed-run visibility (#99879): a recurring dispatch within this many
+# seconds of its scheduled instant renders as "on time". The built-in ticker
+# runs once a minute and a busy tick can push dispatch a couple of minutes
+# past the scheduled instant — that is normal cadence, not gateway downtime.
+_LATE_DISPATCH_TOLERANCE_SECONDS = 300
+
+
+def _classify_dispatch_lateness(lateness_seconds: float, grace_seconds: int) -> str:
+    """Classify a recurring dispatch by how late it fired.
+
+    ``on_time``  — within normal ticker cadence slack;
+    ``late``     — missed the scheduled instant but within the catch-up
+                   grace window (e.g. gateway briefly down);
+    ``catch_up`` — beyond the grace window; the due-scan skipped the
+                   accumulated misses and executed once now.
+    """
+    if lateness_seconds > grace_seconds:
+        return "catch_up"
+    if lateness_seconds > _LATE_DISPATCH_TOLERANCE_SECONDS:
+        return "late"
+    return "on_time"
+
+
 # Durable (persisted-state) recovery counter for a recurring job wedged in a
 # stale ``last_status == "error"`` state with ``next_run_at`` parked in the
 # future.  This is the restart-surviving half of the recurring-cron wedge
@@ -2427,6 +2450,9 @@ def create_job(
         "last_status": None,
         "last_error": None,
         "last_delivery_error": None,
+        # Live-adapter targets whose last send was acked with no message_id /
+        # raw_response (accepted, but UNVERIFIED — surfaced by cron list/doctor).
+        "last_delivery_unverified": None,
         "failure_streak": 0,
         # Delivery configuration
         "deliver": deliver,
@@ -3010,7 +3036,13 @@ def _mark_job_run_locked(
     ``delivery_error`` is tracked separately from the agent error — a job
     can succeed (agent produced output) but fail delivery (platform down).
 
-    ``status`` overrides the derived ``last_status`` ("ok"/"error") with a
+    A run that succeeded but failed delivery records
+    ``last_status = "delivery_failed"`` (never "ok") so the failure is
+    visible to every reader, while ``failure_streak`` stays untouched —
+    the agent did its job.
+
+    ``status`` overrides the derived ``last_status`` ("ok"/"error"/
+    "delivery_failed") with a
     specific terminal status for this run — e.g. ``"blocked_config"`` when
     the pre-dispatch configuration validation refused to run the agent
     (T1-26), so `cronjob list` distinguishes "your config is broken" from
@@ -3035,7 +3067,21 @@ def _mark_job_run_locked(
                 # The transient manual-run context is single-fire: whatever
                 # run just completed consumed it (or superseded it).
                 job.pop("manual_run_prompt", None)
-                job["last_status"] = status or ("ok" if success else "error")
+                # A run whose agent succeeded but whose delivery failed is NOT
+                # "ok": recording it as such hid last_delivery_error behind a
+                # green status in `cron list`/the UI and made a job that never
+                # reached the user look like a quiet success (#83993). It gets
+                # its own status so every reader that keys off "ok" (CLI list,
+                # doctor, cronjob_tools) sees the failure. An explicit
+                # ``status`` override (e.g. "blocked_config") still wins.
+                if status:
+                    job["last_status"] = status
+                elif not success:
+                    job["last_status"] = "error"
+                elif isinstance(delivery_error, str) and delivery_error.strip():
+                    job["last_status"] = "delivery_failed"
+                else:
+                    job["last_status"] = "ok"
                 job["last_error"] = error if not success else None
                 # A healthy run means the configuration validates again — drop
                 # the preflight alert-dedup marker so a FUTURE config break
@@ -4182,6 +4228,28 @@ def _get_due_jobs_locked() -> List[Dict[str, Any]]:
                     for rj in raw_jobs:
                         if rj["id"] == job["id"]:
                             rj["run_claim"] = claim
+                            needs_save = True
+                            break
+
+                # Missed-run visibility (#99879): persist scheduled-vs-actual
+                # dispatch timing on the job record so `hermes cron list` /
+                # `hermes cron status` (separate CLI processes) can show a
+                # late catch-up run as such instead of an ordinary on-time
+                # run. Recurring schedules only — one-shots beyond grace are
+                # retired above, and manual triggers have no scheduled
+                # instant to be late against.
+                if not manual_run and kind in {"cron", "interval"}:
+                    lateness = max(0.0, (now - next_run_dt).total_seconds())
+                    dispatch_stamp = {
+                        "scheduled_at": next_run,
+                        "dispatched_at": now.isoformat(),
+                        "lateness_seconds": round(lateness, 1),
+                        "kind": _classify_dispatch_lateness(lateness, grace),
+                    }
+                    job["last_dispatch"] = dispatch_stamp
+                    for rj in raw_jobs:
+                        if rj["id"] == job["id"]:
+                            rj["last_dispatch"] = dispatch_stamp
                             needs_save = True
                             break
 
