@@ -61,7 +61,6 @@ import { $marketplaceInstalls, isUserTheme, removeUserTheme } from '@/themes/use
 import { CONTROL_TEXT, MODE_OPTIONS } from './constants'
 import { setHermesConfigCache, useHermesConfigRecord } from '../hooks/use-config-record'
 
-import { MODE_OPTIONS } from './constants'
 import { setNested } from './helpers'
 import { PetSettings } from './pet-settings'
 import { ListRow, SectionHeading, SettingsContent, ToggleRow } from './primitives'
