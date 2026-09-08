@@ -2027,6 +2027,7 @@ export interface Translations {
     shiftClickHint: string
     noWorkspace: string
     projectEmpty: string
+    projectLoadFailed: string
     noSessions: string
     noFilterMatches: string
     projects: {
