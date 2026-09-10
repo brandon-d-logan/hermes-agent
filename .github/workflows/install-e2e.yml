@@ -79,6 +79,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fork-only no-op so scheduled runs don't conclude FAILED.
+  # Every real job below is guarded with `github.repository ==
+  # 'NousResearch/hermes-agent'` (forks have no release tags to test FROM).
+  # GitHub marks a scheduled run where ALL jobs are skipped as failed
+  # ("no jobs were run"), which re-triggers the failure email the guards
+  # were meant to silence. This job runs only on forks and always succeeds,
+  # keeping scheduled/fork runs GREEN while upstream runs the real matrix.
+  fork-noop:
+    name: Fork no-op (keeps scheduled runs green)
+    if: github.repository != 'NousResearch/hermes-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "Fork scheduled E2E intentionally skipped (no release tags)."
+
   # Which released versions do we test updating FROM? Resolved once,
   # annotated with what each tag's own tree supports, and shared by every
   # OS's matrix so all combos cover the same set.
