@@ -593,7 +593,6 @@ export function AppearanceSettings() {
                                     setTheme(theme.name)
                                   }
                                 }}
-                                title={a.removeTheme}
                                 type="button"
                               >
                                 <Trash2 className="size-3.5" />
