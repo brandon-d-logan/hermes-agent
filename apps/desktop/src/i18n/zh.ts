@@ -344,7 +344,7 @@ export const zh = defineLocale({
       'nav.commandCenter': '打开命令中心',
       'nav.settings': '打开设置',
       'nav.profiles': '打开配置',
-      'nav.skills': '打开技能',
+      'nav.capabilities': '打开技能',
       'nav.messaging': '打开消息',
       'nav.artifacts': '打开制品',
       'nav.cron': '打开定时任务',
@@ -683,6 +683,10 @@ export const zh = defineLocale({
       completionSoundTitle: 'Completion Sound',
       completionSoundDesc: 'Choose a chime that plays when Hermes finishes responding.',
       completionSoundPreview: 'Preview',
+      hideCodeDiffsTitle: '隐藏代码差异',
+      hideCodeDiffsDesc: '将文件编辑显示为带有新增和删除行数的内联工具行，不显示代码。',
+      hideThreadTimelineTitle: '隐藏对话时间线条',
+      hideThreadTimelineDesc: '隐藏每个对话右侧边缘的导航条。',
       reasoningCollapsedTitle: '默认折叠推理过程',
       reasoningCollapsedDesc: '保留流式推理内容，但在您打开前保持折叠。',
       uiScaleTitle: '界面缩放',
@@ -817,7 +821,7 @@ export const zh = defineLocale({
     },
     fieldLabels: defineFieldCopy({
       model: '默认模型',
-      modelContextLength: '上下文窗口',
+      modelContextLength: '仅覆盖主聊天模型检测到的上下文窗口（以 token 计）。保持为 0 则使用所选模型检测到的值。不影响辅助模型/MoA 模型。',
       fallbackProviders: '备用模型',
       toolsets: '启用的工具集',
       timezone: '时区',
@@ -977,6 +981,11 @@ export const zh = defineLocale({
         targetRatio: '压缩目标',
         protectLastN: '保护最近消息'
       },
+      auxiliary: {
+        compression: {
+          timeout: '压缩模型超时（秒）'
+        }
+      },
       delegation: {
         model: '子智能体模型',
         provider: '子智能体提供方',
@@ -1040,6 +1049,11 @@ export const zh = defineLocale({
       compression: {
         enabled: '当对话变大时对较早的上下文进行摘要。',
         codexGpt55Autoraise: '为受支持的 ChatGPT Codex OAuth 模型将压缩阈值提高到 85%。'
+      },
+      auxiliary: {
+        compression: {
+          timeout: '每次调用辅助压缩模型的等待秒数（默认 120）。本地模型较慢时请调高。'
+        }
       },
       browser: {
         useRealProfile:
@@ -2170,7 +2184,7 @@ export const zh = defineLocale({
     nav: {
       newChat: { title: '新建会话', detail: '开始一个新会话' },
       settings: { title: '设置', detail: '配置 Hermes 桌面端' },
-      skills: { title: '技能与工具', detail: '启用技能、工具集与提供方' },
+      capabilities: { title: '技能与工具', detail: '启用技能、工具集与提供方' },
       messaging: { title: '消息平台', detail: '配置 Telegram、Slack、Discord 等' },
       artifacts: { title: '产物', detail: '浏览生成的输出' }
     },
@@ -2875,7 +2889,7 @@ export const zh = defineLocale({
     },
     nav: {
       'new-session': '新建会话',
-      skills: '技能与工具',
+      capabilities: '技能与工具',
       messaging: '消息平台',
       artifacts: '产物',
       cron: '定时任务'
@@ -3699,6 +3713,7 @@ export const zh = defineLocale({
       xhigh: '极高',
       max: '最高',
       ultra: '超高',
+      sendsOnRoute: (level: string) => `此路由实际发送 ${level}`,
       updateFailed: '模型选项更新失败',
       fastFailed: '快速模式更新失败'
     },
@@ -4083,6 +4098,10 @@ export const zh = defineLocale({
         streaming: '流式连接错误'
       },
       errorRetry: '重试',
+      errorLimitResets: time => `限额将于 ${time} 重置`,
+      errorRetryAtReset: time => `限额重置后重试（${time}）`,
+      errorRetryScheduled: (time, wait) => `将于 ${time} 重试 — 还剩 ${wait}`,
+      errorRetryScheduledCancel: '取消',
       errorStartNewSession: '开始新会话',
       errorSwitchProvider: '切换服务商',
       errorSignInAgain: provider => `重新登录 ${provider}`,
