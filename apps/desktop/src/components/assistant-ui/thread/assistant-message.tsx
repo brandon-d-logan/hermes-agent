@@ -13,6 +13,7 @@ import { type FC, type ReactNode, useCallback, useContext, useEffect, useMemo, u
 import { useInRouterContext, useNavigate } from 'react-router'
 
 import { requestModelMenuToggle } from '@/app/chat/composer/focus'
+import { useComposerScope } from '@/app/chat/composer/scope'
 import { useSessionView } from '@/app/chat/session-view'
 import { SETTINGS_ROUTE } from '@/app/routes'
 import { dispatchedTo } from '@/components/assistant-ui/thread/agent-delivery'
@@ -710,6 +711,7 @@ const ScheduledRetryAction: FC<{ resetsAt: number }> = ({ resetsAt }) => {
       },
       Math.max(0, fireAt - Date.now())
     )
+
     const tick = window.setInterval(() => setNow(Date.now()), 1000)
 
     return () => {
@@ -1044,6 +1046,8 @@ const ReadAloudButton: FC<{ getText: () => string; messageId: string }> = ({ get
   const voicePlayback = useStore($voicePlayback)
   const view = useSessionView()
   const sessionId = useStore(view.$runtimeId)
+  // A Bot chat's session owns its own (connection, profile) → its own TTS voice.
+  const { connectionId, profile } = useComposerScope()
 
   const readAloudStatus =
     voicePlayback.source === 'read-aloud' && voicePlayback.messageId === messageId ? voicePlayback.status : 'idle'
@@ -1062,12 +1066,12 @@ const ReadAloudButton: FC<{ getText: () => string; messageId: string }> = ({ get
     }
 
     try {
-      await playSpeechText(text, { messageId, source: 'read-aloud' })
+      await playSpeechText(text, { connectionId, messageId, profile, source: 'read-aloud' })
       markAssistantIdSpoken(sessionId, view.$messages.get(), messageId)
     } catch (error) {
       notifyError(error, copy.readAloudFailed)
     }
-  }, [copy.readAloudFailed, getText, messageId, sessionId, view.$messages])
+  }, [connectionId, copy.readAloudFailed, getText, messageId, profile, sessionId, view.$messages])
 
   return (
     <TooltipIconButton
