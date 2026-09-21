@@ -3289,6 +3289,86 @@ async function resolveDeployedSha(updateRoot) {
   return null
 }
 
+// The deployed stamp names the branch the bundle was built from. On a fork
+// install that branch is published by a remote that `origin` is not: `origin`
+// points at upstream, whose refs carry neither the branch nor the deployed
+// commit. Measuring the deployed stamp against origin/<configured branch>
+// therefore reports every upstream commit landed since the last nightly deploy
+// as "available" — advertising an update this checkout can never apply, because
+// `hermes update --branch main` refuses on a branch that is not merged into main.
+//
+// Pick the remote that actually carries the deployed commit and measure against
+// its tip instead. A current install reads 0; the number only grows when the
+// deployed build genuinely lags the branch it was built from.
+function readDeployedStampBranch() {
+  const stampPath = IS_PACKAGED
+    ? path.join(process.resourcesPath, 'install-stamp.json')
+    : path.join(APP_ROOT, 'build', 'install-stamp.json')
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(stampPath, 'utf8'))
+
+    return typeof parsed?.branch === 'string' && parsed.branch ? parsed.branch : null
+  } catch {
+    return null
+  }
+}
+
+async function resolveUpdateTarget(updateRoot, originUrl, configuredBranch) {
+  const upstream = { slug: githubRepoSlug(originUrl), branch: configuredBranch, forkManaged: false }
+  const stampBranch = readDeployedStampBranch()
+
+  if (!stampBranch || stampBranch === configuredBranch) {
+    return upstream
+  }
+
+  // The stamp's branch name can be local-only (the sync branch names its own
+  // worktree branch), so match on the deployed commit rather than the name: the
+  // first remote-tracking head containing it is the branch this build came from.
+  const deployedCommit = await resolveDeployedSha(updateRoot)
+
+  if (!deployedCommit) {
+    return upstream
+  }
+
+  const remotes = (await runGit(['remote'], { cwd: updateRoot })).stdout
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+
+  for (const remote of remotes) {
+    const heads = (
+      await runGit(['for-each-ref', '--format=%(refname:short)', `refs/remotes/${remote}/`], { cwd: updateRoot })
+    ).stdout
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => Boolean(line) && !line.endsWith('/HEAD'))
+
+    for (const head of heads) {
+      const contained = await runGit(['merge-base', '--is-ancestor', deployedCommit, head], { cwd: updateRoot })
+
+      if (contained.code !== 0) {
+        continue
+      }
+
+      const url = (await runGit(['remote', 'get-url', remote], { cwd: updateRoot })).stdout.trim()
+      const slug = githubRepoSlug(url)
+
+      if (slug) {
+        const branch = head.slice(remote.length + 1)
+
+        rememberLog(
+          `[updates] deployed ${deployedCommit.slice(0, 8)} comes from ${remote}/${branch}; measuring there, not origin/${configuredBranch}`
+        )
+
+        return { slug, branch, forkManaged: true }
+      }
+    }
+  }
+
+  return upstream
+}
+
 
 // Passive checks never touch git's network side. Every client used to `git
 // fetch` twice per half hour; across the install base that was tens of
@@ -3338,10 +3418,16 @@ async function checkUpdates({ force = false }: { force?: boolean } = {}) {
   }
 
   branch = await resolveHealedBranch(updateRoot, branch)
-  const slug = githubRepoSlug(originUrl)
 
-  const status = slug
-    ? await checkUpdatesViaApi({ slug, branch, currentSha: baseSha })
+  // The branch we MEASURE against is not always the branch we are configured
+  // with — a fork install deploys from a branch origin does not publish. See
+  // resolveUpdateTarget.
+  const target = await resolveUpdateTarget(updateRoot, originUrl, branch)
+
+  branch = target.branch
+
+  const status = target.slug
+    ? await checkUpdatesViaApi({ slug: target.slug, branch, currentSha: baseSha })
     : await checkUpdatesViaLsRemote({ updateRoot, branch, currentSha: baseSha })
 
   const result = {
@@ -4132,6 +4218,40 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
   updateInFlight = true
 
   try {
+    // Fork-managed install: the deployed bundle was built from a branch upstream
+    // does not publish, so the hand-off below would run
+    // `hermes update --branch main` against a checkout parked on that branch. The
+    // CLI refuses before it touches git (a branch not merged into main), which
+    // costs the user a quit, an emergency state.db copy, and an exit-8 that
+    // explains none of it. Land on the manual state with the command that
+    // actually deploys this install instead. A stock upstream install never
+    // reaches this branch — its stamp branch is the configured one.
+    const forkTarget = await resolveUpdateTarget(
+      resolveUpdateRoot(),
+      await getOriginUrl(resolveUpdateRoot()),
+      readDesktopUpdateConfig().branch
+    )
+
+    if (forkTarget.forkManaged) {
+      const command = 'bash ~/.hermes/scripts/deploy-fork-bundle.sh --quit-and-relaunch'
+
+      rememberLog(
+        `[updates] fork-managed install (${forkTarget.slug}@${forkTarget.branch}); refusing in-app hand-off, surfacing \`${command}\``
+      )
+      emitUpdateProgress({ stage: 'manual', message: command, percent: null })
+
+      return {
+        ok: false,
+        manual: true,
+        command,
+        message:
+          `This Hermes is a fork install (${forkTarget.slug}@${forkTarget.branch}), updated by the nightly fork sync — ` +
+          'not by `hermes update`, which would have to switch this checkout off the branch it is built from. ' +
+          `Run \`${command}\` to deploy the latest built bundle now.`,
+        hermesRoot: resolveUpdateRoot()
+      }
+    }
+
     const updater = resolveUpdaterBinary()
 
     if (!updater && !IS_WINDOWS) {
