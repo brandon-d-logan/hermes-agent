@@ -67,6 +67,7 @@ export interface UpdaterStatusWire {
   dirty?: boolean
   hermesRoot?: string
   fetchedAt?: number
+  forkManaged?: boolean
 }
 
 /** The result shape main.ts already sends over `hermes:updates:apply`. */

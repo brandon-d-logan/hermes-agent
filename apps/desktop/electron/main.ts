@@ -3213,6 +3213,176 @@ function emitUpdateProgress(payload) {
   }
 }
 
+// ── Fork-managed installs (nightly deploy script, not `hermes update`) ──────
+// The deployed bundle is built from a worktree branch (brandon-main-sync) that
+// the upstream origin does not publish, so `hermes update --branch main` can
+// never serve it: the CLI refuses on a branch not merged into main (exit 8
+// after a quit and an emergency state.db copy). The check below measures the
+// deployed stamp commit against the remote that actually carries it, and the
+// apply path refuses the in-app hand-off in favor of the deploy script. A
+// stock upstream install has stamp branch 'main' and never enters this path.
+function forkStampInfo(): { commit: string; branch: string } | null {
+  const commit = INSTALL_STAMP?.commit
+  const branch = INSTALL_STAMP?.branch
+
+  if (!commit || !branch || branch === DEFAULT_UPDATE_BRANCH) {
+    return null
+  }
+
+  return { commit, branch }
+}
+
+function forkRepoSlug(originUrl: string): string | null {
+  const match = /github\.com[/:](?<slug>[\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(originUrl || '')
+
+  return match?.groups?.slug ?? null
+}
+
+const FORK_UPDATE_CHECK_CACHE_PATH = path.join(app.getPath('userData'), 'fork-update-check.json')
+
+function readForkUpdateCheckCache(commit: string, now: number) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(FORK_UPDATE_CHECK_CACHE_PATH, 'utf8'))
+
+    return parsed?.commit === commit &&
+      typeof parsed?.fetchedAt === 'number' &&
+      now - parsed.fetchedAt < 24 * 3600 * 1000
+      ? parsed.status
+      : null
+  } catch {
+    return null
+  }
+}
+
+function writeForkUpdateCheckCache(commit: string, status: UpdaterStatusWire) {
+  try {
+    fs.mkdirSync(path.dirname(FORK_UPDATE_CHECK_CACHE_PATH), { recursive: true })
+    writeFileAtomic(FORK_UPDATE_CHECK_CACHE_PATH, JSON.stringify({ commit, fetchedAt: Date.now(), status }))
+  } catch (error) {
+    rememberLog(`[updates] could not persist fork check cache: ${error?.message || error}`)
+  }
+}
+
+async function forkUpdateStatus(updateRoot: string, force: boolean): Promise<UpdaterStatusWire | null> {
+  const stamp = forkStampInfo()
+
+  if (!stamp) {
+    return null
+  }
+
+  const now = Date.now()
+
+  if (!force) {
+    const cached = readForkUpdateCheckCache(stamp.commit, now)
+
+    if (cached) {
+      return cached
+    }
+  }
+
+  const git = args => runGit(args, { cwd: updateRoot }).then(r => r.stdout.trim())
+  const objectKnown = sha =>
+    runGit(['cat-file', '-e', `${sha}^{commit}`], { cwd: updateRoot }).then(r => r.code === 0)
+
+  // The remote-tracking head that contains the deployed commit names the
+  // branch this build came from. Tracking refs can lag a push, so fall back
+  // to ls-remote on the fork remote before giving up.
+  let target: { remote: string; branch: string; slug: string | null } | null = null
+
+  const remotes = ((await git(['remote'])) || '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+
+  for (const remote of remotes) {
+    const heads = ((await git(['for-each-ref', '--format=%(refname:short)', `refs/remotes/${remote}/`])) || '')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => Boolean(line) && !line.endsWith('/HEAD'))
+
+    heads.sort((a, b) => Number(b.endsWith(`/${stamp.branch}`)) - Number(a.endsWith(`/${stamp.branch}`)))
+
+    for (const head of heads) {
+      const contained = await runGit(['merge-base', '--is-ancestor', stamp.commit, head], { cwd: updateRoot })
+
+      if (contained.code !== 0) {
+        continue
+      }
+
+      const url = (await git(['remote', 'get-url', remote])) || ''
+
+      target = { remote, branch: head.slice(remote.length + 1), slug: forkRepoSlug(url) }
+      break
+    }
+
+    if (target) {
+      break
+    }
+  }
+
+  let targetSha: string | null = null
+
+  if (!target) {
+    const probed = await runGit(['ls-remote', 'brandon-fork', 'refs/heads/brandon-main'], { cwd: updateRoot })
+    const sha = probed.code === 0 ? (probed.stdout.trim().split(/\s+/)[0] || '') : ''
+
+    if (/^[0-9a-f]{40}$/i.test(sha) && (await objectKnown(sha))) {
+      const url = (await git(['remote', 'get-url', 'brandon-fork'])) || ''
+
+      target = { remote: 'brandon-fork', branch: 'brandon-main', slug: forkRepoSlug(url) }
+      targetSha = sha
+    }
+  }
+
+  if (!target) {
+    return null
+  }
+
+  if (!targetSha) {
+    const probed = await runGit(['ls-remote', target.remote, `refs/heads/${target.branch}`], { cwd: updateRoot })
+
+    targetSha = probed.code === 0 ? (probed.stdout.trim().split(/\s+/)[0] || '') : ''
+  }
+
+  let behind: number | null = null
+  let commits: UpdaterStatusWire['commits'] = []
+
+  if (/^[0-9a-f]{40}$/i.test(targetSha || '')) {
+    if (targetSha === stamp.commit) {
+      behind = 0
+    } else if (await objectKnown(targetSha!)) {
+      const counted = await runGit(['rev-list', '--count', `${stamp.commit}..${targetSha}`], { cwd: updateRoot })
+
+      behind = counted.code === 0 ? Number.parseInt(counted.stdout.trim(), 10) || 0 : null
+    }
+  }
+
+  const currentBranch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'])) || ''
+
+  const result: UpdaterStatusWire = {
+    supported: true,
+    branch: target.branch,
+    currentBranch,
+    currentSha: stamp.commit,
+    dirty: Boolean(INSTALL_STAMP?.dirty),
+    hermesRoot: updateRoot,
+    fetchedAt: now,
+    forkManaged: true,
+    behind,
+    updateAvailable: behind === null || behind > 0,
+    targetSha: targetSha || undefined,
+    commits
+  }
+
+  writeForkUpdateCheckCache(stamp.commit, result)
+
+  rememberLog(
+    `[updates] fork-managed install: deployed ${stamp.commit.slice(0, 8)} measured against ${target.remote}/${target.branch} (${behind ?? 'unknown'} behind)`
+  )
+
+  return result
+}
+
 async function checkUpdates(opts: { force?: boolean } = {}): Promise<UpdaterStatusWire> {
   // A packaged install delegates to the update owner named by its stamp.
   let strategy: UpdaterStrategy | null = null
@@ -3231,6 +3401,15 @@ async function checkUpdates(opts: { force?: boolean } = {}): Promise<UpdaterStat
       message: error instanceof Error ? error.message : String(error),
       fetchedAt: Date.now()
     }
+  }
+
+  // Fork-managed install: measure against the remote that carries the
+  // deployed commit instead of dispatching to the checkout strategy, whose
+  // Python probe assumes an in-place install measured from checkout HEAD.
+  const fork = await forkUpdateStatus(resolveUpdateRoot(), opts.force === true)
+
+  if (fork) {
+    return fork
   }
 
   // Checkout install: dispatch through the strategy layer — one mechanism,
@@ -4212,6 +4391,37 @@ async function applyUpdates(): Promise<UpdaterApplyResultWire> {
 
     try {
       const strategy: UpdaterStrategy = (await resolvePackagedUpdateStrategy()) ?? resolveCheckoutUpdateStrategy()
+
+      // Fork-managed install: the deployed bundle was built from a branch
+      // upstream does not publish, so the hand-off below would run
+      // `hermes update --branch main` against a checkout parked on that
+      // branch. The CLI refuses before it touches git, which costs the user a
+      // quit, an emergency state.db copy, and an exit-8 that explains none of
+      // it. Land on the manual state with the command that actually deploys
+      // this install instead. A stock upstream install never reaches this
+      // branch — its stamp branch is the configured one.
+      const stamp = forkStampInfo()
+
+      if (stamp && (strategy.mechanism === 'posix-handoff' || strategy.mechanism === 'windows-handoff')) {
+        const command = 'bash ~/.hermes/scripts/deploy-fork-bundle.sh --quit-and-relaunch'
+
+        rememberLog(
+          `[updates] fork-managed install (${stamp.branch}); refusing in-app hand-off, surfacing \`${command}\``
+        )
+        emitUpdateProgress({ stage: 'manual', message: command, percent: null })
+
+        return {
+          ok: false,
+          manual: true,
+          command,
+          message:
+            `This Hermes is a fork install (branch ${stamp.branch}), updated by the nightly fork sync — ` +
+            'not by `hermes update`, which would have to switch this checkout off the branch it is built from. ' +
+            `Run \`${command}\` to deploy the latest built bundle now.`,
+          hermesRoot: resolveUpdateRoot()
+        }
+      }
+
       const result: UpdaterApplyResultWire = await strategy.apply()
       handedOff = result.handedOff === true
 
