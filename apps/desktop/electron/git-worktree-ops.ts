@@ -404,8 +404,10 @@ async function listBranches(repoPath, gitBin) {
 
     const remotes = names(remoteOut).filter(name => {
       // "origin/HEAD" is a symbolic alias for the default branch of the remote.
-      // It is not a branch, and it shows in the list as a duplicate.
-      if (name.endsWith('/HEAD')) {
+      // It is not a branch, and it shows in the list as a duplicate. Note that
+      // `%(refname:short)` renders that ref as the bare remote name ("origin"),
+      // so the '/HEAD' test alone does not catch it.
+      if (!name.includes('/') || name.endsWith('/HEAD')) {
         return false
       }
 

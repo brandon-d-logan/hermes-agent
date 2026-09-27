@@ -3391,7 +3391,10 @@ async function forkUpdateStatus(updateRoot: string, force: boolean): Promise<Upd
     const heads = ((await git(['for-each-ref', '--format=%(refname:short)', `refs/remotes/${remote}/`])) || '')
       .split('\n')
       .map(line => line.trim())
-      .filter(line => Boolean(line) && !line.endsWith('/HEAD'))
+      // `%(refname:short)` renders refs/remotes/<remote>/HEAD as the bare remote
+      // name, which the '/HEAD' test cannot see; treating it as a branch yields
+      // an empty branch name (an update check against no ref at all).
+      .filter(line => Boolean(line) && line.includes('/') && !line.endsWith('/HEAD'))
 
     heads.sort((a, b) => Number(b.endsWith(`/${stamp.branch}`)) - Number(a.endsWith(`/${stamp.branch}`)))
 
