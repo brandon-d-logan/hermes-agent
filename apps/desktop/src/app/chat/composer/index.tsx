@@ -119,6 +119,7 @@ export function ChatBar({
   focusKey,
   gateway,
   maxRecordingSeconds = 120,
+  profile,
   queueSessionKey,
   sessionId,
   state,
@@ -283,6 +284,7 @@ export function ChatBar({
   const slash = useSlashCompletions({
     activeSkin: themeName,
     gateway: gateway ?? null,
+    profile: profile ?? null,
     sessionId: sessionId ?? null,
     skinThemes: availableThemes
   })
