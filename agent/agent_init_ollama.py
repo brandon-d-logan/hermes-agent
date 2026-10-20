@@ -11,7 +11,12 @@ def _configure_ollama_num_ctx(agent, _model_cfg, _config_context_length):
     # model.ollama_num_ctx overrides; model.context_length caps the detected value (VRAM).
     agent._ollama_num_ctx: int | None = None
     _override = _model_cfg.get("ollama_num_ctx") if isinstance(_model_cfg, dict) else None
-    if _override is not None:
+    # `model.ollama_num_ctx` is an Ollama-only (local-server) knob. The auto-detect path
+    # below is gated on a local endpoint; the explicit config override must share that gate,
+    # or a global `model.ollama_num_ctx` (set for a local Ollama rig) would clamp the
+    # compressor window of EVERY provider session — including hosted models with 1M+
+    # context — down to the Ollama figure, compacting far earlier than necessary.
+    if _override is not None and agent.base_url and is_local_endpoint(agent.base_url):
         try:
             agent._ollama_num_ctx = int(_override)
         except (TypeError, ValueError):
