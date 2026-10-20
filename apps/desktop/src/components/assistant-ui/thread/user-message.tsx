@@ -1,7 +1,6 @@
 import { ActionBarPrimitive, BranchPickerPrimitive, MessagePrimitive, useAuiState } from '@assistant-ui/react'
 import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
-import { formatMessageTimestamp } from '@/components/assistant-ui/thread/timestamp'
 import { DirectiveContent } from '@/components/assistant-ui/directive-text'
 import { isAttachmentRef } from '@/components/assistant-ui/reference-kinds'
 import {
@@ -14,6 +13,7 @@ import { ReactionBadge, ReactionPicker } from '@/components/assistant-ui/thread/
 import { BackgroundResult } from '@/components/assistant-ui/thread/system-message'
 import { threadUserOrdinal } from '@/components/assistant-ui/thread/thread-message-index'
 import { MessageTimelineTimestamp } from '@/components/assistant-ui/thread/timeline-timestamp'
+import { formatMessageTimestamp } from '@/components/assistant-ui/thread/timestamp'
 import { type RestoreMessageTarget } from '@/components/assistant-ui/thread/types'
 import { useMessageReactions } from '@/components/assistant-ui/thread/use-message-reactions'
 import { UserMessageText } from '@/components/assistant-ui/thread/user-message-text'
@@ -320,8 +320,7 @@ export const UserMessage: FC<{
   const copy = t.assistant.thread
   const messageId = useAuiState(s => s.message.id)
   const content = useAuiState(s => s.message.content)
-  const fullText = messageContentText(content)
-  const [messageText, setupLearned] = splitSetupLearned(fullText)
+  const messageText = messageContentText(content)
   // Drives the inline timestamp under the bubble. Read through the same
   // useAuiState channel as the rest of the message fields so it re-renders
   // when the runtime backfills the date on a freshly-sent prompt.
