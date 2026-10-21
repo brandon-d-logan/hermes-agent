@@ -9,7 +9,7 @@ import {
   useThreadRuntime
 } from '@assistant-ui/react'
 import { useStore } from '@nanostores/react'
-import { type FC, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { type FC, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useInRouterContext, useNavigate } from 'react-router'
 
 import { requestModelMenuToggle } from '@/app/chat/composer/focus'
@@ -592,6 +592,16 @@ const useErrorText = () =>
     return status?.type === 'incomplete' && typeof status.error === 'string' ? status.error : ''
   })
 
+// When the failure was recorded: the settled bubble's completion (the terminal frame's time), else the
+// row's own timestamp for a hydrated card. Never `createdAt`, whose fallback is render time.
+const useErrorFailedAt = () =>
+  useAuiState(s => {
+    const custom = s.message.metadata?.custom as { timelineCompletedAt?: unknown; timelineTimestamp?: unknown }
+    const at = custom?.timelineCompletedAt ?? custom?.timelineTimestamp
+
+    return typeof at === 'number' && Number.isFinite(at) && at > 0 ? at : undefined
+  })
+
 const ErrorCardHeadline: FC = () => {
   const { t } = useI18n()
   const surface = useErrorSurface()
@@ -826,6 +836,7 @@ const ErrorRecoveryActions: FC = () => {
   const copy = t.assistant.thread
   const surface = useErrorSurface()
   const errorText = useErrorText()
+  const failedAt = useErrorFailedAt()
 
   // useNavigate() would throw here when no Router is above us; the deep-link
   // children mount only when one is (see SettingsLinkAction).
@@ -911,10 +922,11 @@ const ErrorRecoveryActions: FC = () => {
     () =>
       formatErrorDiagnostics({
         errorText,
+        failedAt,
         model: model || undefined,
         surface
       }),
-    [errorText, model, surface]
+    [errorText, failedAt, model, surface]
   )
 
   const startNewSession = useCallback(() => {
@@ -1249,17 +1261,17 @@ const MessageTimestampInline: FC = () => {
 const MessageCompletionTime: FC = () => {
   const messageStatus = useAuiState(s => s.message.status?.type)
   const createdAt = useAuiState(s => s.message.createdAt)
-  const wasRunning = useRef(false)
+  const [hasRun, setHasRun] = useState(false)
   const [completionTime, setCompletionTime] = useState<number | null>(null)
 
   // Capture completion time on first transition out of "running".
   useEffect(() => {
     if (messageStatus === 'running') {
-      wasRunning.current = true
-    } else if (wasRunning.current && completionTime === null && messageStatus === 'complete') {
+      setHasRun(true)
+    } else if (hasRun && completionTime === null && messageStatus === 'complete') {
       setCompletionTime(Date.now())
     }
-  }, [messageStatus, completionTime])
+  }, [messageStatus, hasRun, completionTime])
 
   // Only show once we have a captured completion time, and only when
   // a creation timestamp exists to form the range.
