@@ -1,8 +1,9 @@
 import { Ansi, Box, NoSelect, Text } from '@hermes/ink'
-import { useStore } from '@nanostores/react'
 import { hasAnsi, sanitizeAnsiForRender, stripAnsi } from '@hermes/shared/ansi'
+import { useStore } from '@nanostores/react'
 import { memo, useState } from 'react'
 
+import { $uiState } from '../app/uiStore.js'
 import { TERMUX_TUI_MODE } from '../config/env.js'
 import { LONG_MSG } from '../config/limits.js'
 import { hasLeadGap } from '../domain/blockLayout.js'
@@ -13,10 +14,10 @@ import { ROLE } from '../domain/roles.js'
 import { useT } from '../i18n/useT.js'
 import { transcriptBodyWidth, transcriptGutterWidth } from '../lib/inputMetrics.js'
 import { boundedLiveRenderText, compactPreview, isPasteBackedText } from '../lib/text.js'
+import { type GaugeStyle, hasUsageGauge, splitUsageGaugeLine } from '../lib/usageGauge.js'
 import type { Theme } from '../theme.js'
 import type { ActiveTool, DetailsMode, Msg, SectionVisibility } from '../types.js'
 
-import { $uiState } from '../app/uiStore.js'
 import { Md } from './markdown.js'
 import { StreamingMd } from './streamingMarkdown.js'
 import { ToolTrail } from './thinking.js'
@@ -66,19 +67,23 @@ export const MessageLine = memo(function MessageLine({
 
   // Format timestamp as "Mon DD HH:MM" or "HH:MM" if today (local system time)
   const timeLabel = (() => {
-    if (!showTimestamps || !msg.timestamp) return ''
+    if (!showTimestamps || !msg.timestamp) {return ''}
     const d = new Date(msg.timestamp)
     const now = new Date()
     const isToday = d.toDateString() === now.toDateString()
+
     if (isToday) {
       return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
     }
+
     // Different year: include full date. Same year: omit year.
     const sameYear = d.getFullYear() === now.getFullYear()
     const monthDay = d.toLocaleDateString(undefined, { month: 'short', day: '2-digit' })
     const hm = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+
     return sameYear ? `${monthDay} ${hm}` : `${monthDay} '${String(d.getFullYear()).slice(2)} ${hm}`
   })()
+
   // Per-section overrides win over the global mode, so resolve each section
   // we might consume here once and gate visibility on the *content-bearing*
   // sections only — never on the global mode.  A `trail` message feeds Tool
@@ -192,6 +197,13 @@ export const MessageLine = memo(function MessageLine({
   const content = (() => {
     if (msg.kind === 'slash') {
       return <Text color={t.color.muted}>{msg.text}</Text>
+    }
+
+    // ── `/usage` gauge row: one line with a `[||||    ]` bar, colored like the
+    // model picker. Only these rows take this path; every other system message
+    // keeps its collapse / ANSI / truncation handling below.
+    if (isUsageGaugeRow(msg)) {
+      return <UsageGaugeRow t={t} text={msg.text} />
     }
 
     // ── Collapsible long system message (system prompt, AGENTS.md, etc.) ──
@@ -341,6 +353,26 @@ export const MessageLine = memo(function MessageLine({
     </Box>
   )
 })
+
+const gaugeThemeColor = (t: Theme, style: GaugeStyle): string =>
+  style === 'red' ? t.color.error : style === 'yellow' ? t.color.warn : t.color.ok
+
+const isUsageGaugeRow = (msg: Msg): boolean =>
+  msg.role === 'system' && !msg.kind && !msg.text.includes('\n') && hasUsageGauge(msg.text)
+
+// wrap-ansi treats a colored `[||||||||  ]` as a broken CSI sequence and
+// prints `?[32m`, so each segment is its own <Text> with no wrapping.
+function UsageGaugeRow({ t, text }: { t: Theme; text: string }) {
+  return (
+    <Box>
+      {splitUsageGaugeLine(stripAnsi(text)).map((seg, j) => (
+        <Text color={seg.style ? gaugeThemeColor(t, seg.style) : t.color.muted} key={j}>
+          {seg.text}
+        </Text>
+      ))}
+    </Box>
+  )
+}
 
 export const shouldShowResponseSeparator = (msg: Msg, showDetails: boolean): boolean =>
   msg.role === 'assistant' && showDetails && /\S/.test(msg.text)
