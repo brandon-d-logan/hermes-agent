@@ -94,11 +94,9 @@ import { renderComposerQueueSlot, useComposerQueueScopeKey } from './queue-slot'
 import { RestoredDraftNotice } from './restored-draft-notice'
 import {
   beginComposerComposition,
-  composerPlainText,
   deleteChipBeforeCaret,
   deleteSelectionInEditor,
   insertComposerContentsAtCaret,
-  normalizeComposerEditorDom,
   RICH_INPUT_SLOT
 } from './rich-editor'
 import { useComposerScope, useComposerSurfaceId } from './scope'
@@ -498,20 +496,13 @@ export function ChatBar({
   // flushes to one per paint is lossless.
   const flushRafRef = useRef<number | undefined>(undefined)
 
-  const flushEditorToDraft = (editor: HTMLDivElement) => {
+  const flushEditorToDraft = (editor: HTMLDivElement, typing = false) => {
     if (flushRafRef.current !== undefined) {
       window.cancelAnimationFrame(flushRafRef.current)
       flushRafRef.current = undefined
     }
 
-    normalizeComposerEditorDom(editor)
-
-    const nextDraft = sanitizeComposerInput(composerPlainText(editor))
-
-    if (nextDraft !== draftRef.current) {
-      draftRef.current = nextDraft
-      setComposerText(nextDraft)
-    }
+    syncDraftFromEditor(typing, editor)
 
     window.setTimeout(refreshTrigger, 0)
   }
@@ -526,7 +517,7 @@ export function ChatBar({
 
     flushRafRef.current = window.requestAnimationFrame(() => {
       flushRafRef.current = undefined
-      flushEditorToDraft(editor)
+      flushEditorToDraft(editor, true)
     })
   }
 
