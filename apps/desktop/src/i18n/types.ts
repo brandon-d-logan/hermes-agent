@@ -636,8 +636,6 @@ export interface Translations extends NoticeTranslations {
       openFolder: string
       rescan: string
       reveal: string
-      enable: string
-      disable: string
       failed: string
       kinds: { bundled: string; disk: string; runtime: string }
       installModal: {
@@ -1901,6 +1899,10 @@ export interface Translations extends NoticeTranslations {
     edit: string
     archive: string
     skillArchivedTitle: string
+    lock: string
+    locked: string
+    lockHint: string
+    unlockedHint: string
     skillArchivedMessage: string
     tabPlugins: string
     plugins: PluginUpdateTranslations &
@@ -2467,9 +2469,6 @@ export interface Translations extends NoticeTranslations {
       deleteOn: (gateway: string) => string
       /** At-rest local default pill: device, not Home, and the click's consequence. */
       localDevice: string
-      switchDeviceTitle: string
-      switchDeviceDesc: string
-      switchDeviceConfirm: string
       installDeviceTitle: string
       installDeviceDesc: string
       installDeviceConfirm: string
